@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+.venv/
+
+# Editor
+.idea/
+.vscode/
+
+# Runtime output
+render_service/output/*
+!render_service/output/.gitignore
+!render_service/output/README.md
+render_service/workdir/*
+!render_service/workdir/.gitignore
+!render_service/workdir/README.md
+.ace-tool/

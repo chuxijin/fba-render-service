@@ -1,0 +1,29 @@
+services:
+  render_book:
+    build:
+      context: ../..
+      dockerfile: deploy/render-book/Dockerfile
+    image: fba_render_book:latest
+    container_name: fba_render_book
+    restart: unless-stopped
+    ports:
+      - "${RENDER_BOOK_PORT:-9000}:9000"
+    environment:
+      TZ: Asia/Shanghai
+      RENDER_SERVICE_COMPILE_ENABLED: "${RENDER_SERVICE_COMPILE_ENABLED:-true}"
+      RENDER_SERVICE_TEMPLATES_ROOT: /app/render_service/templates
+      RENDER_SERVICE_FONTS_ROOT: /app/render_service/fonts
+      RENDER_SERVICE_OUTPUT_ROOT: /data/output
+      RENDER_SERVICE_WORK_ROOT: /data/workdir
+      RENDER_SERVICE_CLEANUP_AUX_FILES: "${RENDER_SERVICE_CLEANUP_AUX_FILES:-true}"
+    volumes:
+      - ../../render_service/templates:/app/render_service/templates:ro
+      - ../../render_service/fonts:/app/render_service/fonts:ro
+      - ../../render_service/output:/data/output
+      - ../../render_service/workdir:/data/workdir
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:9000/healthz', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s

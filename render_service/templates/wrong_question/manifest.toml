@@ -1,0 +1,12 @@
+key = "wrong_question"
+name = "错题重刷"
+description = "错题重做与复盘模板。"
+entrypoint = "main.tex.j2"
+template_source = "exam_paper"
+default_variant = "questions_only"
+
+[variant_entrypoints]
+questions_only = "main.tex.j2"
+solutions_only = "main.tex.j2"
+combined_inline = "main.tex.j2"
+combined_appendix = "main.tex.j2"
