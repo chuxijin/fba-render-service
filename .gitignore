@@ -18,3 +18,6 @@ render_service/workdir/*
 !render_service/workdir/.gitignore
 !render_service/workdir/README.md
 .ace-tool/
+
+.claude/
+

@@ -51,6 +51,18 @@
 - `exam`：考试封面（仿真准考证栏、条形码区、注意事项）
 - `practice`：练习封面（TikZ 色块设计、题本概览）
 
+练习封面通过 `metadata` 支持以下可选字段：
+
+| 字段 | 说明 | 默认值 |
+|------|------|-------|
+| `practice_cover_motto` | 封面座右铭 | 空（不显示） |
+| `practice_cover_creator` | 制作人 | 空（不显示） |
+| `practice_cover_update_time` | 更新时间 | 空（不显示） |
+| `practice_cover_img` | 封面图片路径 | 空（不显示） |
+| `practice_cover_kicker` | 顶部前置标题 | 模板名称 |
+| `practice_cover_badge` | 右上角徽章 | 题本类型 |
+| `practice_cover_footer` | 底部说明文案 | 自动生成描述 |
+
 > Pad 版不显示封面。
 
 ### 纸张大小（`paper_size`）

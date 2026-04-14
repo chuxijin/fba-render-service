@@ -120,6 +120,10 @@
 {% set practice_cover_badge = metadata_data.get('practice_cover_badge', book_kind_label) %}
 {% set practice_cover_footer = metadata_data.get('practice_cover_footer', '根据筛选条件自动生成，可用于课后练习、阶段测评与错题回刷。') %}
 {% set practice_cover_meta = metadata_data.get('practice_cover_meta', []) if metadata_data.get('practice_cover_meta') is iterable and metadata_data.get('practice_cover_meta') is not string else book_data.get('meta_lines', []) %}
+{% set practice_cover_motto = metadata_data.get('practice_cover_motto', '') %}
+{% set practice_cover_creator = metadata_data.get('practice_cover_creator', '') %}
+{% set practice_cover_update_time = metadata_data.get('practice_cover_update_time', '') %}
+{% set practice_cover_img = metadata_data.get('practice_cover_img', '') %}
 {% set show_header = metadata_data.get('show_header', True) %}
 {% set show_footer = metadata_data.get('show_footer', True) %}
 {% set show_header_rule = metadata_data.get('show_header_rule', True) %}
@@ -248,7 +252,7 @@
 \end{titlepage}
 {%- endmacro %}
 
-{% macro render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data) -%}
+{% macro render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img) -%}
 \begin{titlepage}
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture,overlay]
@@ -260,6 +264,9 @@
 \fill[white] ($(current page.south west)+(1.7cm,2.5cm)$) rectangle ($(current page.south east)+(-1.7cm,9.4cm)$);
 \node[anchor=west,text=white,font=\fontsize{13pt}{16pt}\selectfont] at ($(current page.north west)+(2.1cm,-1.8cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_kicker | tex_escape }} };
 \node[anchor=east,rounded corners=0.15cm,fill=white,text=accentdark,inner xsep=0.45cm,inner ysep=0.2cm,font=\small\bfseries] at ($(current page.north east)+(-2.05cm,-1.8cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_badge | tex_escape }} };
+{% if practice_cover_img %}
+\node[anchor=south east,inner sep=0pt] at ($(current page.north east)+(-2.3cm,-4.4cm)$) { \includegraphics[height=3.0cm]{ {{ practice_cover_img }} } };
+{% endif %}
 \fill[accent!16] ($(current page.south west)+(2.25cm,8.35cm)$) rectangle ($(current page.south west)+(4.8cm,8.95cm)$);
 \fill[accent!16] ($(current page.south west)+(2.25cm,7.55cm)$) rectangle ($(current page.south west)+(6.1cm,8.15cm)$);
 \fill[accent!16] ($(current page.south west)+(2.25cm,6.75cm)$) rectangle ($(current page.south west)+(5.35cm,7.35cm)$);
@@ -274,6 +281,9 @@
 {{ font_switch(cover_font_family) }}{\fontsize{16pt}{25pt}\selectfont\bfseries\textcolor{accentdark}{ {{ book_data.get('subtitle') | tex_escape }} }}\\[0.85em]
 {% endif %}
 {{ font_switch(cover_font_family) }}{\large\textcolor{inkmuted}{ {{ template_name | tex_escape }} }}
+{% if practice_cover_motto %}\\[0.65em]
+{{ font_switch(cover_font_family) }}{\normalsize\textcolor{inkmuted}{\itshape「{{ practice_cover_motto | tex_escape }}」}}
+{% endif %}
 }
 
 \vspace{4.6cm}
@@ -288,6 +298,12 @@
 {% endif %}
 {% if metadata_data.get('subject') %}
 \textbf{学科} & {{ metadata_data.get('subject') | tex_escape }} \\
+{% endif %}
+{% if practice_cover_creator %}
+\textbf{制作人} & {{ practice_cover_creator | tex_escape }} \\
+{% endif %}
+{% if practice_cover_update_time %}
+\textbf{更新时间} & {{ practice_cover_update_time | tex_escape }} \\
 {% endif %}
 \end{tabularx}
 }
@@ -369,7 +385,7 @@
 {% endif %}
 
 {% if show_practice_cover %}
-{{ render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data) }}
+{{ render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img) }}
 {% endif %}
 
 {% if not first_page_header_footer %}
@@ -429,14 +445,15 @@
 
 {% if question.get('options') %}
 \par\noindent\hspace*{2.2em}%
-\parbox[t]{\dimexpr\textwidth-2.2em\relax}{%
-{{ render_option_list(question.get('options', [])) }}}%
+\parbox[t]{\dimexpr\textwidth-2.2em\relax}{ %
+{{ render_option_list(question.get('options', [])) }}%
+}%
 {% endif %}
 
 {% if show_inline_solution %}
 \vspace{0.45em}
 \noindent\hspace*{2.2em}%
-\parbox[t]{\dimexpr\textwidth-2.2em\relax}{%
+\parbox[t]{\dimexpr\textwidth-2.2em\relax}{ %
 \begin{analysisbox}
 {\small \textcolor{accentdark}{\textbf{答案：}} {{ question.get('answer_text') | default('待补充') | tex_escape }}}
 {% if question.get('analysis_text') %}\\[0.3em]
@@ -503,3 +520,4 @@
 {% endif %}
 
 \end{document}
+
