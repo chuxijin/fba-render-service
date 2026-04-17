@@ -56,6 +56,7 @@ class RenderResponse(BaseModel):
     log_path: str | None = None
     pdf_download_path: str | None = None
     log_download_path: str | None = None
+    preview_download_paths: list[str] = Field(default_factory=list)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 

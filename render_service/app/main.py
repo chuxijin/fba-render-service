@@ -21,6 +21,7 @@ from render_service.app.latex import (
 from render_service.app.schemas import RenderRequest, RenderResponse, new_job_id
 from render_service.app.template_loader import list_templates, render_template
 from render_service.app.template_loader import load_manifest, resolve_entrypoint
+from render_service.app.preview_generator import generate_pdf_previews
 
 
 @asynccontextmanager
@@ -41,6 +42,8 @@ def resolve_artifact_path(job_id: str, render_variant: str, artifact_kind: str) 
         return settings.output_root / f'{job_id}_{render_variant}.pdf'
     if artifact_kind == 'log':
         return settings.work_root / job_id / render_variant / f'main_{render_variant}.log'
+    if artifact_kind.startswith('preview_'):
+        return settings.output_root / f'{job_id}_{render_variant}_{artifact_kind}.jpg'
     raise HTTPException(status_code=404, detail=f'不支持的产物类型：{artifact_kind}')
 
 
@@ -66,7 +69,13 @@ async def get_job_artifact(job_id: str, render_variant: str, artifact_kind: str)
     if not artifact_path.exists() or not artifact_path.is_file():
         raise HTTPException(status_code=404, detail='产物不存在。')
 
-    media_type = 'application/pdf' if artifact_kind == 'pdf' else 'text/plain; charset=utf-8'
+    if artifact_kind == 'pdf':
+        media_type = 'application/pdf'
+    elif artifact_kind.startswith('preview_'):
+        media_type = 'image/jpeg'
+    else:
+        media_type = 'text/plain; charset=utf-8'
+
     return FileResponse(
         path=artifact_path,
         media_type=media_type,
@@ -103,6 +112,7 @@ async def render_book(payload: RenderRequest) -> RenderResponse:
     tex_path = write_tex_file(workspace, tex_source, render_variant)
     pdf_path = None
     log_path = None
+    preview_download_paths = []
     status = 'rendered'
 
     if payload.compile_pdf:
@@ -114,6 +124,13 @@ async def render_book(payload: RenderRequest) -> RenderResponse:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         pdf_path = publish_pdf(job_id, render_variant, generated_pdf)
         log_path = latex_log_path
+        
+        # 截取前五页高质量预览图
+        preview_files = generate_pdf_previews(pdf_path, settings.output_root, max_pages=5)
+        for i, _ in enumerate(preview_files):
+            # artifact_kind = preview_1, preview_2...
+            preview_download_paths.append(build_artifact_route(job_id, render_variant, f'preview_{i+1}'))
+            
         status = 'compiled'
         cleanup_auxiliary_files(workspace)
 
@@ -130,4 +147,5 @@ async def render_book(payload: RenderRequest) -> RenderResponse:
         log_path=str(log_path) if log_path else None,
         pdf_download_path=build_artifact_route(job_id, render_variant, 'pdf') if pdf_path else None,
         log_download_path=build_artifact_route(job_id, render_variant, 'log') if log_path else None,
+        preview_download_paths=preview_download_paths,
     )

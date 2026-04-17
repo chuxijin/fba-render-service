@@ -137,5 +137,14 @@ async def localize_context_images(
         localized = await _localize_value(copied, context=download_context)
 
     if isinstance(localized, dict):
+        if 'metadata' in localized and isinstance(localized['metadata'], dict):
+            for key in ['practice_cover_img', 'practice_cover_avatar']:
+                url = localized['metadata'].get(key)
+                if url and isinstance(url, str) and url.lower().startswith(('http://', 'https://')):
+                    local_path = await _download_image_to_assets(source_url=url, context=download_context)
+                    if local_path:
+                        localized['metadata'][key] = local_path
+                    else:
+                        localized['metadata'][key] = '' # Clear it so LaTeX does not crash
         return localized
     return copied

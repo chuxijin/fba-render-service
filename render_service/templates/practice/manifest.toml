@@ -2,7 +2,6 @@ key = "practice"
 name = "刷题练习本"
 description = "按题目、题型、难度、考点等条件自由组合生成练习本。"
 entrypoint = "main.tex.j2"
-template_source = "exam_paper"
 default_variant = "questions_only"
 
 [variant_entrypoints]

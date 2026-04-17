@@ -14,6 +14,7 @@
 {% set paper_size_map = {'a4': 'a4paper', 'a5': 'a5paper', 'b5': 'b5paper', 'letter': 'letterpaper', 'legal': 'legalpaper'} %}
 {% set paper_size = paper_size_map.get(paper_size_raw, 'a4paper') %}
 {% endif %}
+{% set double_sided = options_data.get('double_sided') or metadata_data.get('double_sided', False) %}
 {% set page_margin = metadata_data.get('page_margin', options_data.get('page_margin', '1.2cm' if is_pad else '1.8cm')) %}
 {% set base_font_size = metadata_data.get('base_font_size', options_data.get('base_font_size', '11pt')) %}
 {% set font_family_map = {
@@ -34,7 +35,7 @@
 {% set body_font_family = font_family_map.get(body_font_family_raw, 'songti') %}
 {% set heading_font_family = font_family_map.get(heading_font_family_raw, 'heiti') %}
 {% set cover_font_family = font_family_map.get(cover_font_family_raw, 'heiti') %}
-\documentclass[{{ base_font_size }},{{ paper_size }}]{ctexart}
+\documentclass[{{ base_font_size }},{{ paper_size }}{% if double_sided %},twoside{% endif %}]{ctexart}
 \usepackage[{{ paper_size }},margin={{ page_margin }}]{geometry}
 \usepackage{enumitem}
 \usepackage{amsmath,amssymb}
@@ -125,6 +126,8 @@
 {% set practice_cover_creator = metadata_data.get('practice_cover_creator', '') %}
 {% set practice_cover_update_time = metadata_data.get('practice_cover_update_time', '') %}
 {% set practice_cover_img = metadata_data.get('practice_cover_img', '') %}
+{% set practice_cover_username = metadata_data.get('practice_cover_username', '') %}
+{% set practice_cover_avatar = metadata_data.get('practice_cover_avatar', '') %}
 {% set show_header = metadata_data.get('show_header', True) %}
 {% set show_footer = metadata_data.get('show_footer', True) %}
 {% set show_header_rule = metadata_data.get('show_header_rule', True) %}
@@ -132,7 +135,15 @@
 {% set first_page_header_footer = metadata_data.get('first_page_header_footer', True) %}
 {% set show_page_number = metadata_data.get('show_page_number', True) %}
 {% set page_number_position_raw = (metadata_data.get('page_number_position', 'center') or 'center') | string | lower %}
+{% if double_sided %}
+{% set page_number_position_map = {'left': 'LO,RE', 'center': 'C', 'right': 'RO,LE'} %}
+{% set header_left_pos = 'LO,RE' %}
+{% set header_right_pos = 'RO,LE' %}
+{% else %}
 {% set page_number_position_map = {'left': 'L', 'center': 'C', 'right': 'R'} %}
+{% set header_left_pos = 'L' %}
+{% set header_right_pos = 'R' %}
+{% endif %}
 {% set page_number_position = page_number_position_map.get(page_number_position_raw, 'C') %}
 {% set header_left = metadata_data.get('header_left', book_data.get('title', '未命名题本')) %}
 {% set header_center = metadata_data.get('header_center', '') %}
@@ -252,70 +263,88 @@
 \null
 \end{titlepage}
 {%- endmacro %}
-
-{% macro render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img) -%}
+{% macro render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img, practice_cover_username, practice_cover_avatar) -%}
 \begin{titlepage}
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture,overlay]
 \fill[accentsoft] (current page.south west) rectangle (current page.north east);
-\fill[accent] ($(current page.north west)+(0cm,-4.6cm)$) rectangle ($(current page.north east)+(0cm,-0.9cm)$);
-\fill[white] ($(current page.north west)+(2.1cm,-7.1cm)$) rectangle ($(current page.north east)+(-2.0cm,-4.0cm)$);
-\draw[accent!40,line width=1.1pt] ($(current page.north west)+(2.1cm,-7.1cm)$) rectangle ($(current page.north east)+(-2.0cm,-4.0cm)$);
-\draw[accent!25,line width=0.8pt] ($(current page.south west)+(1.7cm,2.5cm)$) rectangle ($(current page.south east)+(-1.7cm,9.4cm)$);
-\fill[white] ($(current page.south west)+(1.7cm,2.5cm)$) rectangle ($(current page.south east)+(-1.7cm,9.4cm)$);
-\node[anchor=west,text=white,font=\fontsize{13pt}{16pt}\selectfont] at ($(current page.north west)+(2.1cm,-1.8cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_kicker | tex_escape }} };
-\node[anchor=east,rounded corners=0.15cm,fill=white,text=accentdark,inner xsep=0.45cm,inner ysep=0.2cm,font=\small\bfseries] at ($(current page.north east)+(-2.05cm,-1.8cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_badge | tex_escape }} };
+
+% 顶部大图 Banner
 {% if practice_cover_img %}
-\node[anchor=south east,inner sep=0pt] at ($(current page.north east)+(-2.3cm,-4.4cm)$) { \includegraphics[height=3.0cm]{ {{ practice_cover_img }} } };
+\node[anchor=north,inner sep=0pt,minimum width=\paperwidth,minimum height=9cm] at (current page.north) {\includegraphics[width=\paperwidth,height=9cm,keepaspectratio=false]{ {{ practice_cover_img }} }};
+\fill[accent!80!black,opacity=0.4] (current page.north west) rectangle ($(current page.north east)+(0cm,-9cm)$);
+{% else %}
+\fill[accent] (current page.north west) rectangle ($(current page.north east)+(0cm,-9cm)$);
 {% endif %}
-\fill[accent!16] ($(current page.south west)+(2.25cm,8.35cm)$) rectangle ($(current page.south west)+(4.8cm,8.95cm)$);
-\fill[accent!16] ($(current page.south west)+(2.25cm,7.55cm)$) rectangle ($(current page.south west)+(6.1cm,8.15cm)$);
-\fill[accent!16] ($(current page.south west)+(2.25cm,6.75cm)$) rectangle ($(current page.south west)+(5.35cm,7.35cm)$);
-\node[anchor=west,text=accent,font=\fontsize{12pt}{15pt}\selectfont] at ($(current page.south west)+(2.15cm,1.6cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_footer | tex_escape }} };
+
+% Kicker Title & Badge on top left & right
+\node[anchor=west,text=white,font=\fontsize{14pt}{16pt}\selectfont,inner sep=0pt] at ($(current page.north west)+(2cm,-2cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_kicker | tex_escape }} };
+\node[anchor=east,rounded corners=0.2cm,fill=white,text=accentdark,inner xsep=0.45cm,inner ysep=0.2cm,font=\small\bfseries] at ($(current page.north east)+(-2cm,-2cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_badge | tex_escape }} };
+
+% Motto area overlay
+\node[anchor=west,align=left,text=white,font=\fontsize{15pt}{24pt}\selectfont] at ($(current page.north west)+(2cm,-6cm)$) {
+\parbox{0.75\textwidth}{
+{% if practice_cover_motto %}
+{\itshape「{{ practice_cover_motto | tex_escape }}」}
+{% else %}
+{\itshape「博学之，审问之，慎思之，明辨之，笃行之。」}
+{% endif %}
+}};
+\draw[white,line width=1.5pt] ($(current page.north west)+(1.5cm,-5cm)$) -- ($(current page.north west)+(1.5cm,-7cm)$);
+
+% Footer background elements
+\fill[accentdark!10] ($(current page.south west)+(2.2cm,2.0cm)$) rectangle ($(current page.south east)+(-2.2cm,4.6cm)$);
+\node[anchor=west,text=inkmuted,font=\fontsize{10pt}{15pt}\selectfont] at ($(current page.south west)+(2.2cm,1.2cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_footer | tex_escape }} };
+
+% Bottom Right Username / Avatar Badge
+\fill[white,rounded corners=0.4cm] ($(current page.south east)+(-6cm,5.5cm)$) rectangle ($(current page.south east)+(-2cm,7cm)$);
+\node[anchor=east,text=accentdark,font=\large\bfseries] at ($(current page.south east)+(-3.6cm,6.25cm)$) { {{ (practice_cover_username or practice_cover_creator or '用户') | tex_escape }} };
+{% if practice_cover_avatar %}
+\node[anchor=center] at ($(current page.south east)+(-2.8cm,6.25cm)$) {\includegraphics[width=1cm,height=1cm]{ {{ practice_cover_avatar }} }};
+{% else %}
+\fill[accent] ($(current page.south east)+(-2.8cm,6.25cm)$) circle (0.5cm);
+\node[anchor=center,text=white,font=\bfseries] at ($(current page.south east)+(-2.8cm,6.25cm)$) {U};
+{% endif %}
+
 \end{tikzpicture}
 
-\vspace*{5.15cm}
-\hspace*{2.7cm}
-\parbox{0.66\textwidth}{
-{{ font_switch(cover_font_family) }}{\fontsize{26pt}{37pt}\selectfont\bfseries {{ book_data.get('title', '未命名题本') | tex_escape }}}\\[0.75em]
+\vspace*{7cm}
+\hspace*{1.8cm}
+\parbox[t]{0.75\textwidth}{
+{{ font_switch(cover_font_family) }}{\fontsize{28pt}{40pt}\selectfont\bfseries\textcolor{black}{ {{ book_data.get('title', '未命名题本') | tex_escape }} }}\\[1em]
 {% if book_data.get('subtitle') %}
-{{ font_switch(cover_font_family) }}{\fontsize{16pt}{25pt}\selectfont\bfseries\textcolor{accentdark}{ {{ book_data.get('subtitle') | tex_escape }} }}\\[0.85em]
+{{ font_switch(cover_font_family) }}{\fontsize{16pt}{25pt}\selectfont\bfseries\textcolor{accentdark}{ {{ book_data.get('subtitle') | tex_escape }} }}\\[1em]
 {% endif %}
-{{ font_switch(cover_font_family) }}{\large\textcolor{inkmuted}{ {{ template_name | tex_escape }} }}
-{% if practice_cover_motto %}\\[0.65em]
-{{ font_switch(cover_font_family) }}{\normalsize\textcolor{inkmuted}{\itshape「{{ practice_cover_motto | tex_escape }}」}}
-{% endif %}
+{{ font_switch(cover_font_family) }}{\Large\textcolor{inkmuted}{ {{ template_name | tex_escape }} }}
 }
 
-\vspace{4.6cm}
-\hspace*{2.3cm}
-\parbox{0.72\textwidth}{
-\renewcommand{\arraystretch}{1.45}
-\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.1cm}X}
+\vspace{2cm}
+\hspace*{1.8cm}
+\parbox[t]{0.75\textwidth}{
+\renewcommand{\arraystretch}{1.6}
+{\large\bfseries\textcolor{accentdark}{题本概要}}\\[0.5em]
+\begin{tabularx}{0.8\linewidth}{>{\raggedright\arraybackslash}p{3cm}X}
 \textbf{题本类型} & {{ practice_cover_badge | tex_escape }} \\
-\textbf{题量} & {{ paper_data.get('question_count', 0) }} 题 \\
+\textbf{整体题量} & {{ paper_data.get('question_count', 0) }} 题 \\
 {% if paper_data.get('material_count', 0) %}
-\textbf{材料数量} & {{ paper_data.get('material_count', 0) }} 组 \\
+\textbf{材料块数} & {{ paper_data.get('material_count', 0) }} 组 \\
 {% endif %}
 {% if metadata_data.get('subject') %}
-\textbf{学科} & {{ metadata_data.get('subject') | tex_escape }} \\
-{% endif %}
-{% if practice_cover_creator %}
-\textbf{制作人} & {{ practice_cover_creator | tex_escape }} \\
+\textbf{所涉学科} & {{ metadata_data.get('subject') | tex_escape }} \\
 {% endif %}
 {% if practice_cover_update_time %}
-\textbf{更新时间} & {{ practice_cover_update_time | tex_escape }} \\
+\textbf{生成时间} & {{ practice_cover_update_time | tex_escape }} \\
 {% endif %}
 \end{tabularx}
 }
 
 {% if practice_cover_meta %}
-\vspace{1.2cm}
-\hspace*{2.3cm}
-\parbox{0.72\textwidth}{
-{\normalsize\bfseries\textcolor{accentdark}{使用说明}}\\[0.45em]
+\vspace*{1.5cm}
+\hspace*{2.2cm}
+\parbox{0.75\textwidth}{
+{\large\bfseries\textcolor{accentdark}{使用与指引}}\\[0.6em]
 {% for line in practice_cover_meta[:4] %}
-{\small {{ line | tex_escape }}}\\[0.3em]
+{\normalsize {{ line | tex_escape }}}\\[0.4em]
 {% endfor %}
 }
 {% endif %}
@@ -366,14 +395,14 @@
 \renewcommand{\footrulewidth}{ {% if show_footer and show_footer_rule %}0.4pt{% else %}0pt{% endif %} }
 \renewcommand{\headrule}{\hbox to\headwidth{\color{ruleline}\leaders\hrule height \headrulewidth\hfill}}
 {% if show_header %}
-\fancyhead[L]{\small {{ font_switch(body_font_family) }}\textcolor{accentdark}{ {{ header_left | tex_escape }} }}
+\fancyhead[{{ header_left_pos }}]{\small {{ font_switch(body_font_family) }}\textcolor{accentdark}{ {{ header_left | tex_escape }} }}
 \fancyhead[C]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ header_center | tex_escape }} }}
-\fancyhead[R]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ header_right | tex_escape }} }}
+\fancyhead[{{ header_right_pos }}]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ header_right | tex_escape }} }}
 {% endif %}
 {% if show_footer %}
-\fancyfoot[L]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ footer_left | tex_escape }} }}
+\fancyfoot[{{ header_left_pos }}]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ footer_left | tex_escape }} }}
 \fancyfoot[C]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ footer_center | tex_escape }} }}
-\fancyfoot[R]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ footer_right | tex_escape }} }}
+\fancyfoot[{{ header_right_pos }}]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ footer_right | tex_escape }} }}
 {% endif %}
 {% if show_page_number %}
 \fancyfoot[{{ page_number_position }}]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{第 \thepage 页\quad 共 \pageref*{LastPage} 页}}
@@ -386,7 +415,17 @@
 {% endif %}
 
 {% if show_practice_cover %}
-{{ render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img) }}
+{{ render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img, practice_cover_username, practice_cover_avatar) }}
+{% endif %}
+
+{% if show_exam_cover or show_practice_cover %}
+{% if double_sided %}
+\newpage
+\thispagestyle{empty}
+\mbox{}
+\clearpage
+\setcounter{page}{1}
+{% endif %}
 {% endif %}
 
 {% if not first_page_header_footer %}
