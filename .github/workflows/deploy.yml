@@ -27,11 +27,22 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -p ${{ secrets.DEPLOY_SSH_PORT || 22 }} -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Pull and rebuild
+      - name: Pull and deploy
         run: |
           ssh -p ${{ secrets.DEPLOY_SSH_PORT || 22 }} \
-            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
-            "cd ${{ env.DEPLOY_PATH }} \
-            && git pull origin main \
-            && cd deploy/render-book \
-            && docker compose up -d --build"
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'DEPLOY'
+          cd /www/wwwroot/fba-render-service
+          git pull origin main
+
+          # Check if Dockerfile or Python source changed — only then rebuild image
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+          if echo "$CHANGED" | grep -qE '(Dockerfile|requirements\.txt|render_service/.*\.py)'; then
+            echo ">>> Source or Dockerfile changed, rebuilding..."
+            cd deploy/render-book
+            docker compose up -d --build
+          else
+            echo ">>> Only templates/config changed, restarting container..."
+            cd deploy/render-book
+            docker compose restart
+          fi
+          DEPLOY
