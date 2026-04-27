@@ -1,0 +1,37 @@
+name: Deploy render-book
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-render-book
+  cancel-in-progress: false
+
+env:
+  DEPLOY_PATH: /www/wwwroot/fba-render-service
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Add server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p ${{ secrets.DEPLOY_SSH_PORT || 22 }} -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Pull and rebuild
+        run: |
+          ssh -p ${{ secrets.DEPLOY_SSH_PORT || 22 }} \
+            ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+            "cd ${{ env.DEPLOY_PATH }} \
+            && git pull origin main \
+            && cd deploy/render-book \
+            && docker compose up -d --build"
