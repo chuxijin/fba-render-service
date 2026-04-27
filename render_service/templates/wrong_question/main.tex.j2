@@ -1,0 +1,467 @@
+{% set variant = render_variant | default('questions_only') %}
+{% set render_plan_data = render_plan | default({}) %}
+{% set metadata_data = metadata | default({}) %}
+{% set options_data = options | default({}) %}
+{% set book_data = book | default({}) %}
+{% set paper_data = paper | default({}) %}
+{% set layout_mode = options_data.get('layout_mode', options_data.get('density', 'standard')) %}
+{% set is_pad = layout_mode in ('pad_landscape', 'pad_portrait') %}
+{% set is_single_per_page = layout_mode in ('single', 'pad_landscape', 'pad_portrait') %}
+{% if is_pad %}
+{% set paper_size = 'paperwidth=200mm,paperheight=' ~ ('150mm' if layout_mode == 'pad_landscape' else '250mm') %}
+{% else %}
+{% set paper_size_raw = (metadata_data.get('paper_size') or options_data.get('paper_size') or 'A4') | string | lower %}
+{% set paper_size_map = {'a4': 'a4paper', 'a5': 'a5paper', 'b5': 'b5paper', 'letter': 'letterpaper', 'legal': 'legalpaper'} %}
+{% set paper_size = paper_size_map.get(paper_size_raw, 'a4paper') %}
+{% endif %}
+{% set double_sided = options_data.get('double_sided') or metadata_data.get('double_sided', False) %}
+{% set page_margin = metadata_data.get('page_margin', options_data.get('page_margin', '1.2cm' if is_pad else '1.8cm')) %}
+{% set base_font_size = metadata_data.get('base_font_size', options_data.get('base_font_size', '11pt')) %}
+{% set font_family_map = {
+    'song': 'songti',
+    'songti': 'songti',
+    'serif': 'songti',
+    'hei': 'heiti',
+    'heiti': 'heiti',
+    'sans': 'heiti',
+    'kai': 'kaishu',
+    'kaishu': 'kaishu',
+    'fang': 'fangsong',
+    'fangsong': 'fangsong'
+} %}
+{% set body_font_family_raw = ((metadata_data.get('body_font_family') or 'song') | string | lower) %}
+{% set heading_font_family_raw = ((metadata_data.get('heading_font_family') or 'hei') | string | lower) %}
+{% set cover_font_family_raw = ((metadata_data.get('cover_font_family') or 'hei') | string | lower) %}
+{% set body_font_family = font_family_map.get(body_font_family_raw, 'songti') %}
+{% set heading_font_family = font_family_map.get(heading_font_family_raw, 'heiti') %}
+{% set cover_font_family = font_family_map.get(cover_font_family_raw, 'heiti') %}
+\documentclass[{{ base_font_size }},{{ paper_size }}{% if double_sided %},twoside{% endif %}]{ctexart}
+\usepackage[{{ paper_size }},margin={{ page_margin }}]{geometry}
+\usepackage{enumitem}
+\usepackage{amsmath,amssymb}
+\usepackage{times}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{calc}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{hyperref}
+\usepackage{lastpage}
+\usepackage[most]{tcolorbox}
+{% set dark_mode = options_data.get('dark_mode', False) %}
+{% set watermark_text = metadata_data.get('watermark_text', '') %}
+{% if watermark_text %}
+\usepackage{draftwatermark}
+\SetWatermarkText{ {{ watermark_text | tex_escape }} }
+\SetWatermarkScale{0.5}
+\SetWatermarkColor[gray]{ {{ '0.75' if dark_mode else '0.92' }} }
+{% endif %}
+
+{% set theme = options_data.get('theme', 'orange') %}
+{% set layout_mode_base = layout_mode if layout_mode in ('compact', 'standard', 'loose') else 'standard' %}
+{% set display_source = options_data.get('show_source', True) %}
+{% set show_question_body = variant != 'solutions_only' %}
+{% set show_inline_solution = variant == 'combined_inline' %}
+{% set show_appendix_solution = variant == 'combined_appendix' %}
+{% set show_solution_only = variant == 'solutions_only' %}
+{% set stretch_map = {'compact': '1.08', 'standard': '1.18', 'loose': '1.30'} %}
+{% set itemsep_map = {'compact': '0.50em', 'standard': '0.85em', 'loose': '1.20em'} %}
+{% set theme_map = {
+    'blue': {'accent': '1F4E79', 'accent_dark': '15334D', 'accent_soft': 'EAF2F9', 'rule': '8FB7D9'},
+    'green': {'accent': '2E6A57', 'accent_dark': '1E4338', 'accent_soft': 'E8F3EF', 'rule': '9BC8B6'},
+    'orange': {'accent': 'AF5A2A', 'accent_dark': '6E381A', 'accent_soft': 'F9EEE7', 'rule': 'E1B292'},
+    'purple': {'accent': '6B4A8C', 'accent_dark': '452C5F', 'accent_soft': 'F0EAF7', 'rule': 'C9B4DE'},
+    'teal': {'accent': '01847C', 'accent_dark': '015D57', 'accent_soft': 'E5F5F4', 'rule': '7FC8C4'},
+    'crimson': {'accent': '8C2B2B', 'accent_dark': '5C1A1A', 'accent_soft': 'F7EAEA', 'rule': 'D49A9A'},
+    'indigo': {'accent': '38558F', 'accent_dark': '243860', 'accent_soft': 'EBF0F7', 'rule': '97AFCF'},
+    'amber': {'accent': 'D58A05', 'accent_dark': '8A5A03', 'accent_soft': 'FDF3E0', 'rule': 'E8C478'}
+} %}
+{% set colors = theme_map.get(theme, theme_map['orange']) %}
+{% set book_kind_labels = {'module': '模块本', 'wrong': '错题本', 'exam': '真题本', 'custom': '特定练习本'} %}
+{% set variant_labels = {
+    'questions_only': '题目版',
+    'solutions_only': '解析版',
+    'combined_inline': '题目与解析合订版（逐题附解析）',
+    'combined_appendix': '题目与解析合订版（解析置后）'
+} %}
+{% set template_name = template_manifest.get('name', '题本') if template_manifest else '题本' %}
+{% set book_kind = render_plan_data.get('book_kind', metadata_data.get('book_kind', 'wrong')) %}
+{% set book_kind_label = book_kind_labels.get(book_kind, '题本') %}
+{% set variant_label = variant_labels.get(variant, '题本') %}
+{% set is_exam_book = book_kind == 'exam' %}
+{% set show_question_source_label = display_source and not is_exam_book %}
+{% set cover_style = metadata_data.get('cover_style', 'practice') %}
+{% set show_cover_page = not show_solution_only and not is_pad %}
+{% set show_wrong_cover = show_cover_page and cover_style == 'practice' %}
+{% set wrong_cover_kicker = metadata_data.get('wrong_cover_kicker', metadata_data.get('practice_cover_kicker', template_name)) %}
+{% set wrong_cover_badge = metadata_data.get('wrong_cover_badge', metadata_data.get('practice_cover_badge', '错题重刷')) %}
+{% set wrong_cover_footer = metadata_data.get('wrong_cover_footer', metadata_data.get('practice_cover_footer', '基于历史错题自动生成，建议先独立作答，再结合解析完成复盘。')) %}
+{% set wrong_cover_slogan = metadata_data.get('wrong_cover_slogan', metadata_data.get('practice_cover_motto', '错题不是负担，而是下一次提分最短的路径。')) %}
+{% set wrong_cover_focus = metadata_data.get('wrong_cover_focus', '优先回看做错原因，再验证是否真正掌握同类题型。') %}
+{% set wrong_cover_plan = metadata_data.get('wrong_cover_plan', '建议采用「重做一遍 - 对照解析 - 总结陷阱」的三步复刷方式。') %}
+{% set wrong_cover_img = metadata_data.get('wrong_cover_img', metadata_data.get('practice_cover_img', '')) %}
+{% set wrong_cover_update_time = metadata_data.get('wrong_cover_update_time', metadata_data.get('generated_at', metadata_data.get('practice_cover_update_time', ''))) %}
+{% set wrong_cover_recent_days = metadata_data.get('window_recent_days') %}
+{% set wrong_cover_bank_name = metadata_data.get('bank_name', '') %}
+{% set wrong_cover_chapter_name = metadata_data.get('chapter_name', '') %}
+{% set wrong_cover_subject = metadata_data.get('subject', '') %}
+{% set wrong_cover_username = metadata_data.get('wrong_cover_username', metadata_data.get('practice_cover_username', metadata_data.get('practice_cover_creator', ''))) %}
+{% set wrong_cover_avatar = metadata_data.get('wrong_cover_avatar', metadata_data.get('practice_cover_avatar', '')) %}
+{% set wrong_cover_filters = metadata_data.get('filters', {}) if metadata_data.get('filters') is mapping else {} %}
+{% set wrong_cover_knowledge_points_raw = wrong_cover_filters.get('knowledge_points') if wrong_cover_filters else [] %}
+{% set wrong_cover_knowledge_points = wrong_cover_knowledge_points_raw if wrong_cover_knowledge_points_raw is iterable and wrong_cover_knowledge_points_raw is not string else [] %}
+{% set show_header = metadata_data.get('show_header', True) %}
+{% set show_footer = metadata_data.get('show_footer', True) %}
+{% set show_header_rule = metadata_data.get('show_header_rule', True) %}
+{% set show_footer_rule = metadata_data.get('show_footer_rule', False) %}
+{% set first_page_header_footer = metadata_data.get('first_page_header_footer', True) %}
+{% set show_page_number = metadata_data.get('show_page_number', True) %}
+{% set page_number_position_raw = (metadata_data.get('page_number_position', 'center') or 'center') | string | lower %}
+{% if double_sided %}
+{% set page_number_position_map = {'left': 'LO,RE', 'center': 'C', 'right': 'RO,LE'} %}
+{% set header_left_pos = 'LO,RE' %}
+{% set header_right_pos = 'RO,LE' %}
+{% else %}
+{% set page_number_position_map = {'left': 'L', 'center': 'C', 'right': 'R'} %}
+{% set header_left_pos = 'L' %}
+{% set header_right_pos = 'R' %}
+{% endif %}
+{% set page_number_position = page_number_position_map.get(page_number_position_raw, 'C') %}
+{% set header_left = metadata_data.get('header_left', book_data.get('title', '未命名题本')) %}
+{% set header_center = metadata_data.get('header_center', '') %}
+{% set header_right = metadata_data.get('header_right', variant_label) %}
+{% set footer_left = metadata_data.get('footer_left', '') %}
+{% set footer_center = metadata_data.get('footer_center', '') %}
+{% set footer_right = metadata_data.get('footer_right', '') %}
+
+{% macro font_switch(font_family) -%}
+{% if font_family == 'heiti' %}\heiti\relax {% elif font_family == 'kaishu' %}\kaishu\relax {% elif font_family == 'fangsong' %}\fangsong\relax {% else %}\songti\relax {% endif %}
+{%- endmacro %}
+
+{% macro render_text_block(text) -%}
+{{ text | default('') | html_to_tex }}
+{%- endmacro %}
+
+{% macro render_section_heading(title, question_count=0) -%}
+\vspace{0.35em}
+\begin{center}
+{\Large {{ font_switch(heading_font_family) }}\bfseries\textcolor{black}{ {{ title | tex_escape }} }}{% if question_count %}\hspace{0.5em}{\normalsize\textcolor{inkmuted}{（共 {{ question_count }} 题）}}{% endif %}
+\end{center}
+\vspace{0.1em}
+{%- endmacro %}
+
+{% macro render_option_content(option) -%}
+{% if option.get('content_tex') %}
+{{ option.get('content_tex') }}
+{% else %}
+{{ option.get('content_text', '') | html_to_tex }}
+{% endif %}
+{%- endmacro %}
+
+{% macro render_option_label(option) -%}
+\makebox[2.05em][l]{\textnormal{ {{- option.get('key', '') | string | upper | tex_escape -}}.}}
+{%- endmacro %}
+
+{% macro render_option_list(options) -%}
+{% set option_columns = options | option_layout_columns %}
+{% if option_columns == 1 %}
+{% for option in options %}
+\begingroup
+\setlength{\parindent}{0pt}
+\hangindent=2.2em
+\hangafter=1
+\noindent{{ render_option_label(option) }}{{ render_option_content(option) }}\par
+\endgroup
+{% if not loop.last %}
+\vspace{0.2em}
+{% endif %}
+{% endfor %}
+{% else %}
+{\setlength{\tabcolsep}{0pt}
+\renewcommand{\arraystretch}{1.05}
+\begin{tabularx}{\linewidth}{@{}{% for _ in range(option_columns) %}>{\raggedright\arraybackslash}X{% if not loop.last %}@{\hspace{1.2em}}{% endif %}{% endfor %}@{}}
+{% for row in options | batch(option_columns, none) %}
+{% for option in row %}
+{% if option %}
+\parbox[t]{\linewidth}{\raggedright\begingroup\setlength{\parindent}{0pt}\hangindent=2.2em\hangafter=1{{ render_option_label(option) }}{{ render_option_content(option) }}\par\endgroup}
+{% else %}
+~
+{% endif %}{% if not loop.last %} & {% endif %}
+{% endfor %} \\{% if not loop.last %}[0.45em]{% endif %}
+{% endfor %}
+\end{tabularx}}
+{% endif %}
+{%- endmacro %}
+
+{% macro render_material_block(material) -%}
+\vspace{0.65em}
+\noindent
+{\bfseries\textcolor{accentdark}{材料{% if material.get('title') %}：{{ material.get('title') | tex_escape }}{% endif %}}\\[0.35em]
+{{ render_text_block(material.get('content_text')) }}
+}
+{%- endmacro %}
+
+{% macro render_question_source_prefix(question) -%}
+{% set resolved_source_label = question.get('source_label') or question.get('source_text') %}
+{% if show_question_source_label and resolved_source_label %}
+{\small\textcolor{inkmuted}{（{{ resolved_source_label | tex_escape }}）}}\hspace{0.45em}
+{% endif %}
+{%- endmacro %}
+
+{% macro render_wrong_cover(book_data, wrong_cover_kicker, wrong_cover_badge, wrong_cover_footer, wrong_cover_slogan, wrong_cover_focus, wrong_cover_plan, wrong_cover_img, wrong_cover_update_time, wrong_cover_recent_days, wrong_cover_bank_name, wrong_cover_chapter_name, wrong_cover_subject, wrong_cover_knowledge_points, wrong_cover_username, wrong_cover_avatar, paper_data) -%}
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{tikzpicture}[remember picture,overlay]
+\fill[white] (current page.south west) rectangle (current page.north east);
+{% if wrong_cover_img %}
+\node[anchor=north west,inner sep=0pt] at (current page.north west) {\includegraphics[width=\paperwidth,height=7.7cm]{ {{ wrong_cover_img }} }};
+{% else %}
+\fill[accent!14] (current page.north west) rectangle ($(current page.north east)+(0cm,-7.7cm)$);
+\fill[accent!22] ($(current page.north west)+(0cm,-4.9cm)$) rectangle ($(current page.north east)+(0cm,-7.7cm)$);
+{% endif %}
+\fill[white,opacity=0.08] ($(current page.north west)+(0cm,-6.9cm)$) rectangle ($(current page.north east)+(0cm,-7.7cm)$);
+
+\node[anchor=east,text=black!72,font=\fontsize{11pt}{14pt}\selectfont] at ($(current page.north east)+(-0.7cm,-7.15cm)$) { {{ font_switch(cover_font_family) }} {{ wrong_cover_slogan | tex_escape }} };
+
+\node[anchor=west,text=black,font=\fontsize{34pt}{42pt}\selectfont\bfseries] at ($(current page.north west)+(1.35cm,-9.2cm)$) { {{ font_switch(cover_font_family) }} {{ book_data.get('title', '错题重刷本') | tex_escape }} };
+{% if book_data.get('subtitle') %}
+\node[anchor=west,text=black,font=\fontsize{22pt}{30pt}\selectfont\bfseries] at ($(current page.north west)+(1.35cm,-11.15cm)$) { {{ font_switch(cover_font_family) }} {{ book_data.get('subtitle') | tex_escape }} };
+{% endif %}
+
+\node[anchor=north,text=black,font=\fontsize{12pt}{18pt}\selectfont] at ($(current page.north west)!0.5!(current page.north east)+(0cm,-14.2cm)$) { {{ font_switch(cover_font_family) }} {{ wrong_cover_badge | tex_escape }} };
+\node[anchor=north,text=black,font=\fontsize{11.2pt}{18pt}\selectfont] at ($(current page.north west)!0.5!(current page.north east)+(0cm,-15.5cm)$) {
+\parbox{0.68\paperwidth}{
+\centering
+{{ font_switch(cover_font_family) }}{% if wrong_cover_bank_name %}题库：{{ wrong_cover_bank_name | tex_escape }}{% else %}题库：未限定{% endif %}\\[0.35em]
+{% if wrong_cover_chapter_name %}章节：{{ wrong_cover_chapter_name | tex_escape }}{% else %}章节：按当前筛选结果生成{% endif %}\\[0.35em]
+题量：{{ paper_data.get('question_count', 0) }} 题{% if paper_data.get('material_count', 0) %} / {{ paper_data.get('material_count', 0) }} 组材料{% endif %}\\[0.35em]
+{% if wrong_cover_subject %}学科：{{ wrong_cover_subject | tex_escape }}\\[0.35em]{% endif %}
+{% if wrong_cover_recent_days %}时间窗：近 {{ wrong_cover_recent_days }} 天错题\\[0.35em]{% endif %}
+{% if wrong_cover_knowledge_points %}考点：{{ wrong_cover_knowledge_points[:4] | join(' / ') | tex_escape }}\\[0.35em]{% endif %}
+{{ wrong_cover_focus | tex_escape }}
+}
+};
+
+{% if wrong_cover_avatar %}
+\node[anchor=center] at ($(current page.south west)!0.5!(current page.south east)+(0cm,2.85cm)$) {\includegraphics[width=1.05cm,height=1.05cm]{ {{ wrong_cover_avatar }} }};
+{% else %}
+\draw[black,line width=0.8pt] ($(current page.south west)!0.5!(current page.south east)+(0cm,2.85cm)$) circle (0.52cm);
+\node[anchor=center,text=black,font=\fontsize{11pt}{11pt}\selectfont\bfseries] at ($(current page.south west)!0.5!(current page.south east)+(0cm,2.85cm)$) { {{ font_switch(cover_font_family) }} 人 };
+{% endif %}
+{% if wrong_cover_username %}
+\node[anchor=center,text=black,font=\fontsize{11pt}{15pt}\selectfont\bfseries] at ($(current page.south west)!0.5!(current page.south east)+(0cm,1.7cm)$) { {{ font_switch(cover_font_family) }} {{ wrong_cover_username | tex_escape }} };
+{% endif %}
+{% if wrong_cover_update_time %}
+\node[anchor=center,text=black,font=\fontsize{10.5pt}{14pt}\selectfont] at ($(current page.south west)!0.5!(current page.south east)+(0cm,0.95cm)$) { {{ font_switch(cover_font_family) }} 生成时间：{{ wrong_cover_update_time | tex_escape }} };
+{% endif %}
+\end{tikzpicture}
+\null
+\end{titlepage}
+{%- endmacro %}
+
+\definecolor{accent}{HTML}{ {{ colors.get('accent') }} }
+\definecolor{accentdark}{HTML}{ {{ colors.get('accent_dark') }} }
+\definecolor{accentsoft}{HTML}{ {{ colors.get('accent_soft') }} }
+\definecolor{ruleline}{HTML}{ {{ colors.get('rule') }} }
+\definecolor{inkmuted}{HTML}{6A6A6A}
+{% if dark_mode %}
+\definecolor{darkbg}{HTML}{1E1E1E}
+\definecolor{darkfg}{HTML}{E0E0E0}
+\definecolor{darkmuted}{HTML}{999999}
+\pagecolor{darkbg}
+\color{darkfg}
+\definecolor{accentsoft}{HTML}{2A2A2A}
+\definecolor{inkmuted}{HTML}{999999}
+{% endif %}
+\newcommand{\circnum}[1]{\tikz[baseline=(char.base)]\node[draw{% if dark_mode %},text=darkfg,draw=darkmuted{% endif %},circle,inner sep=0.35pt,minimum size=1.55em](char){\fontsize{8.4pt}{8.4pt}\selectfont #1};}
+
+\newtcolorbox{analysisbox}{
+  breakable,
+  enhanced,
+  colback=accentsoft,
+  colframe=accent,
+  boxrule=0pt,
+  leftrule=2.5pt,
+  arc=2pt,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,
+  before skip=0.45em,
+  after skip=0.45em,
+}
+
+\setlength{\parindent}{0pt}
+\setlength{\headheight}{22pt}
+\setstretch{ {{ stretch_map.get(layout_mode_base, '1.18') }} }
+\setlist[enumerate,1]{leftmargin=*,label=\arabic*.,labelsep=0.6em,itemsep={{ itemsep_map.get(layout_mode_base, '0.85em') }},topsep=0.4em}
+\setlist[enumerate,2]{leftmargin=1.8em,label=\Alph*.,itemsep=0.25em,topsep=0.25em}
+\AtBeginDocument{ {{ font_switch(body_font_family) }} }
+
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{ {% if show_header and show_header_rule %}0.4pt{% else %}0pt{% endif %} }
+\renewcommand{\footrulewidth}{ {% if show_footer and show_footer_rule %}0.4pt{% else %}0pt{% endif %} }
+\renewcommand{\headrule}{\hbox to\headwidth{\color{ruleline}\leaders\hrule height \headrulewidth\hfill}}
+{% if show_header %}
+\fancyhead[{{ header_left_pos }}]{\small {{ font_switch(body_font_family) }}\textcolor{accentdark}{ {{ header_left | tex_escape }} }}
+\fancyhead[C]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ header_center | tex_escape }} }}
+\fancyhead[{{ header_right_pos }}]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ header_right | tex_escape }} }}
+{% endif %}
+{% if show_footer %}
+\fancyfoot[{{ header_left_pos }}]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ footer_left | tex_escape }} }}
+\fancyfoot[C]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ footer_center | tex_escape }} }}
+\fancyfoot[{{ header_right_pos }}]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{ {{ footer_right | tex_escape }} }}
+{% endif %}
+{% if show_page_number %}
+\fancyfoot[{{ page_number_position }}]{\small {{ font_switch(body_font_family) }}\textcolor{inkmuted}{第 \thepage 页\quad 共 \pageref*{LastPage} 页}}
+{% endif %}
+
+\begin{document}
+
+{% if show_wrong_cover %}
+{{ render_wrong_cover(book_data, wrong_cover_kicker, wrong_cover_badge, wrong_cover_footer, wrong_cover_slogan, wrong_cover_focus, wrong_cover_plan, wrong_cover_img, wrong_cover_update_time, wrong_cover_recent_days, wrong_cover_bank_name, wrong_cover_chapter_name, wrong_cover_subject, wrong_cover_knowledge_points, wrong_cover_username, wrong_cover_avatar, paper_data) }}
+{% endif %}
+
+{% if show_wrong_cover %}
+{% if double_sided %}
+\newpage
+\thispagestyle{empty}
+\mbox{}
+\clearpage
+\setcounter{page}{1}
+{% endif %}
+{% endif %}
+
+{% if not first_page_header_footer %}
+\thispagestyle{empty}
+{% endif %}
+
+{% if not show_cover_page %}
+\begin{center}
+{\color{accent}\rule{\textwidth}{1.4pt}}\\[0.9em]
+{\Huge \bfseries {{ book_data.get('title', '未命名题本') | tex_escape }}}\\[0.45em]
+{% if book_data.get('subtitle') %}
+{\large \textcolor{accentdark}{ {{ book_data.get('subtitle') | tex_escape }} }}\\[0.35em]
+{% endif %}
+{\normalsize \textcolor{inkmuted}{ {{ template_name | tex_escape }} \quad | \quad {{ book_kind_label | tex_escape }} \quad | \quad {{ variant_label | tex_escape }} }}
+\end{center}
+
+\vspace{0.5em}
+\noindent
+\colorbox{accentsoft}{
+\parbox{\dimexpr\textwidth-2\fboxsep\relax}{
+\textbf{题本概览}\hfill{}
+题量：{{ paper_data.get('question_count', 0) }}
+{% if paper_data.get('material_count', 0) %}\quad{}材料：{{ paper_data.get('material_count', 0) }}{% endif %}
+{% if wrong_cover_subject %}\quad{}学科：{{ wrong_cover_subject | tex_escape }}{% endif %}\\[0.45em]
+{% for line in book_data.get('meta_lines', []) %}
+{{ line | tex_escape }}{% if not loop.last %}\\{% endif %}
+{% endfor %}
+}}
+{% endif %}
+
+{% if show_question_body %}
+\vspace{1.2em}
+{% set rendered_material_ids = namespace(values=[]) %}
+{% for section in paper_data.get('sections', []) %}
+{{ render_section_heading(section.get('title'), section.get('questions', []) | length) }}
+
+{% for question in section.get('questions', []) %}
+{% set question_material_ids_raw = question.get('material_ids', []) %}
+{% set question_material_ids = question_material_ids_raw if question_material_ids_raw is iterable and question_material_ids_raw is not string else [] %}
+{% for material in paper_data.get('materials', []) %}
+{% set material_id = material.get('id') %}
+{% if material_id and material_id in question_material_ids and material_id not in rendered_material_ids.values %}
+{{ render_material_block(material) }}
+{% set _ = rendered_material_ids.values.append(material_id) %}
+{% endif %}
+{% endfor %}
+
+\vspace{0.45em}
+\noindent
+\hangindent=2.5em\hangafter=1
+{\bfseries\makebox[2.2em][l]{ {{ question.get('number', loop.index) }}.}}\hspace{0.28em}{{ render_question_source_prefix(question) }}%
+{% if question.get('stem_tex') %}
+{{ question.get('stem_tex') }}
+{% else %}
+{{ render_text_block(question.get('stem_text', '')) }}
+{% endif %}
+
+{% if question.get('options') %}
+\par\noindent\hspace*{2.2em}%
+\parbox[t]{\dimexpr\textwidth-2.2em\relax}{ %
+{{ render_option_list(question.get('options', [])) }}%
+}%
+{% endif %}
+
+{% if show_inline_solution %}
+\vspace{0.45em}
+\noindent\hspace*{2.2em}%
+\parbox[t]{\dimexpr\textwidth-2.2em\relax}{ %
+\begin{analysisbox}
+{\small \textcolor{accentdark}{\textbf{答案：}} {{ question.get('answer_text') | default('待补充') | tex_escape }}}
+{% if question.get('analysis_text') %}\\[0.3em]
+{\small \textcolor{accentdark}{\textbf{解析：}} {{ render_text_block(question.get('analysis_text')) }}}
+{% endif %}
+\end{analysisbox}}%
+{% endif %}
+{% if is_single_per_page and not loop.last %}
+\newpage
+{% endif %}
+{% endfor %}
+{% if not loop.last %}
+\vspace{0.9em}
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if show_solution_only %}
+{\Large \bfseries \textcolor{accentdark}{参考答案与解析}}\\[-0.15em]
+{\color{ruleline}\rule{\textwidth}{0.6pt}}
+
+{% for section in paper_data.get('sections', []) %}
+{{ render_section_heading(section.get('title')) }}
+\begin{enumerate}
+{% for question in section.get('questions', []) %}
+\item
+{\textbf{第 {{ question.get('number') }} 题}}
+
+{% if question.get('stem_tex') %}
+{{ question.get('stem_tex') }}
+{% elif question.get('stem_text') %}
+{{ render_text_block(question.get('stem_text')) }}
+{% endif %}
+
+\vspace{0.3em}
+{\textcolor{accentdark}{\textbf{答案：}} {{ question.get('answer_text') | default('待补充') | tex_escape }}}
+{% if question.get('analysis_text') %}
+
+{\textcolor{accentdark}{\textbf{解析：}} {{ render_text_block(question.get('analysis_text')) }}}
+{% endif %}
+{% endfor %}
+\end{enumerate}
+{% endfor %}
+{% endif %}
+
+{% if show_appendix_solution %}
+\newpage
+{\Large \bfseries \textcolor{accentdark}{参考答案与解析}}\\[-0.15em]
+{\color{ruleline}\rule{\textwidth}{0.6pt}}
+\begin{enumerate}
+{% for section in paper_data.get('sections', []) %}
+{% for question in section.get('questions', []) %}
+\item
+{\textbf{第 {{ question.get('number') }} 题}}
+\quad{}
+{{ question.get('answer_text') | default('待补充') | tex_escape }}
+{% if question.get('analysis_text') %}
+
+{{ render_text_block(question.get('analysis_text')) }}
+{% endif %}
+{% endfor %}
+{% endfor %}
+\end{enumerate}
+{% endif %}
+
+\end{document}

@@ -3,7 +3,7 @@
 | 模板 Key | 名称 | LaTeX 母版 | 说明 |
 |----------|------|-----------|------|
 | `exam_paper` | 真题套卷 | 自身 | 完整套卷，考试封面 |
-| `practice` | 刷题练习本 | exam_paper | 专项训练 / 自由组卷，练习封面 |
-| `wrong_question` | 错题重刷 | exam_paper | 个性化错题本 |
+| `practice` | 刷题练习本 | 自身 | 专项训练 / 自由组卷，练习封面 |
+| `wrong_question` | 错题重刷 | 自身 | 个性化错题本，独立错题封面 |
 
-所有模板共享 `exam_paper/main.tex.j2` 母版，通过 `manifest.toml` 中的 `template_source` 声明复用关系。
+当前 3 套内置模板都拥有独立入口文件；如果后续需要复用已有版式，仍然可以通过 `manifest.toml` 中的 `template_source` 声明复用关系。

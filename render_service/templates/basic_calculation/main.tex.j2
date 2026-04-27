@@ -1,0 +1,79 @@
+{% set variant = render_variant | default('questions_only') %}
+{% set metadata_data = metadata | default({}) %}
+{% set options_data = options | default({}) %}
+{% set book_data = book | default({}) %}
+{% set paper_data = paper | default({}) %}
+{% set sections = paper_data.get('sections', []) %}
+{% set show_question_body = variant != 'solutions_only' %}
+{% set show_answers = variant in ('solutions_only', 'combined_appendix') %}
+{% set layout_mode = options_data.get('layout_mode', 'standard') %}
+{% set paper_size_raw = (metadata_data.get('paper_size') or options_data.get('paper_size') or 'A4') | string | lower %}
+{% set paper_size_map = {'a4': 'a4paper', 'a5': 'a5paper', 'b5': 'b5paper', 'letter': 'letterpaper'} %}
+{% set paper_size = paper_size_map.get(paper_size_raw, 'a4paper') %}
+{% set margin_map = {'compact': '1.25cm', 'standard': '1.55cm', 'loose': '1.85cm'} %}
+{% set page_margin = metadata_data.get('page_margin', margin_map.get(layout_mode, '1.55cm')) %}
+{% set theme = options_data.get('theme', 'amber') %}
+{% set theme_map = {
+    'blue': {'accent': '1F4E79', 'soft': 'EAF2F9'},
+    'green': {'accent': '2E6A57', 'soft': 'E8F3EF'},
+    'orange': {'accent': 'AF5A2A', 'soft': 'F9EEE7'},
+    'purple': {'accent': '6B4A8C', 'soft': 'F0EAF7'},
+    'teal': {'accent': '01847C', 'soft': 'E5F5F4'},
+    'crimson': {'accent': '8C2B2B', 'soft': 'F7EAEA'},
+    'indigo': {'accent': '38558F', 'soft': 'EBF0F7'},
+    'amber': {'accent': 'B7791F', 'soft': 'FFF7E6'}
+} %}
+{% set colors = theme_map.get(theme, theme_map['amber']) %}
+\documentclass[11pt,{{ paper_size }}]{ctexart}
+\usepackage[{{ paper_size }},margin={{ page_margin }}]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage[table]{xcolor}
+\usepackage{multicol}
+\usepackage{enumitem}
+\definecolor{accent}{HTML}{ {{ colors.accent }} }
+\definecolor{ink}{HTML}{111827}
+\definecolor{muted}{HTML}{64748B}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\columnsep}{1.1cm}
+\setlist[enumerate]{leftmargin=*,itemsep=1.25em,topsep=0.3em}
+
+\begin{document}
+
+\begin{center}
+{\heiti\LARGE\textcolor{accent}{ {{ book_data.get('title', '基础计算练习') | tex_escape }} }}\\[0.35em]
+{% if book_data.get('subtitle') %}
+{\large {{ book_data.get('subtitle') | tex_escape }}}\\[0.35em]
+{% endif %}
+\end{center}
+\vspace{0.4em}
+
+{% if show_question_body %}
+{% for section in sections %}
+\begin{enumerate}
+{% for question in section.get('questions', []) %}
+\item {\Large {{ question.get('stem_text', '') | tex_escape }} } \vspace{1.45em}
+{% endfor %}
+\end{enumerate}
+{% endfor %}
+{% endif %}
+
+{% if show_answers %}
+\clearpage
+\begin{center}
+{\heiti\LARGE\textcolor{accent}{答案速查}}\\[0.35em]
+{\small\textcolor{muted}{建议先完成题目后再核对答案。}}
+\end{center}
+\vspace{0.5em}
+\begin{multicols}{3}
+\begin{enumerate}
+{% for section in sections %}
+{% for question in section.get('questions', []) %}
+\item {{ question.get('answer_text', '') | tex_escape }}
+{% endfor %}
+{% endfor %}
+\end{enumerate}
+\end{multicols}
+{% endif %}
+
+\end{document}

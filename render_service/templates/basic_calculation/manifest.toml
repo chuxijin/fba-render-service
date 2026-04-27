@@ -1,11 +1,10 @@
-key = "wrong_question"
-name = "错题重刷"
-description = "错题重做与复盘模板。"
+key = "basic_calculation"
+name = "基础计算练习"
+description = "用于生成口算、估算、除法等基础计算训练题单。"
 entrypoint = "main.tex.j2"
 default_variant = "questions_only"
 
 [variant_entrypoints]
 questions_only = "main.tex.j2"
 solutions_only = "main.tex.j2"
-combined_inline = "main.tex.j2"
 combined_appendix = "main.tex.j2"
