@@ -40,6 +40,18 @@ jobs:
             exit 1
           fi
 
+          if timeout 2 bash -c '</dev/tcp/127.0.0.1/7890' >/dev/null 2>&1; then
+            export http_proxy=http://127.0.0.1:7890
+            export https_proxy=http://127.0.0.1:7890
+            export HTTP_PROXY=http://127.0.0.1:7890
+            export HTTPS_PROXY=http://127.0.0.1:7890
+            export ALL_PROXY=http://127.0.0.1:7890
+            export NO_PROXY=127.0.0.1,localhost
+            echo "Proxy enabled: http://127.0.0.1:7890"
+          else
+            echo "Proxy not detected on 127.0.0.1:7890"
+          fi
+
           uv venv .venv --allow-existing
           uv pip install --python .venv/bin/python \
             -r render_service/requirements.txt \
