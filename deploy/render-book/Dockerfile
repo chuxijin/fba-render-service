@@ -24,7 +24,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY render_service/requirements.txt /tmp/render-service-requirements.txt
-RUN pip install -r /tmp/render-service-requirements.txt
+RUN python -m pip install --upgrade pip setuptools wheel \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --extra-index-url https://pypi.org/simple \
+    && pip install -r /tmp/render-service-requirements.txt \
+    -i https://mirrors.aliyun.com/pypi/simple/ \
+    --extra-index-url https://pypi.org/simple \
+    --timeout 120 \
+    --retries 10
 
 COPY render_service /app/render_service
 COPY deploy/render-book/entrypoint.sh /entrypoint.sh
