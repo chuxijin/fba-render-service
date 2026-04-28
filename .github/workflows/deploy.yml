@@ -9,6 +9,7 @@ concurrency:
 
 env:
   DEPLOY_PATH: /www/wwwroot/fba-render-service
+  SERVICE_NAME: fba-render-service
 
 jobs:
   deploy:
@@ -29,18 +30,22 @@ jobs:
         run: |
           ssh -p ${{ secrets.DEPLOY_SSH_PORT || 22 }} \
             ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'DEPLOY'
-          cd /www/wwwroot/fba-render-service
+          set -e
+
+          cd ${{ env.DEPLOY_PATH }}
           git pull origin main
 
-          # Check if Dockerfile or Python source changed — only then rebuild image
-          CHANGED=$(git diff --name-only HEAD~1 HEAD)
-          if echo "$CHANGED" | grep -qE '(Dockerfile|requirements\.txt|render_service/.*\.py)'; then
-            echo ">>> Source or Dockerfile changed, rebuilding..."
-            cd deploy/render-book
-            docker compose up -d --build
-          else
-            echo ">>> Only templates/config changed, restarting container..."
-            cd deploy/render-book
-            docker compose restart
+          if ! command -v uv >/dev/null 2>&1; then
+            echo "uv is not installed or not available in PATH"
+            exit 1
           fi
+
+          uv venv .venv --allow-existing
+          uv pip install --python .venv/bin/python \
+            -r render_service/requirements.txt \
+            -i https://mirrors.aliyun.com/pypi/simple/ \
+            --extra-index-url https://pypi.org/simple
+
+          systemctl restart ${{ env.SERVICE_NAME }}
+          systemctl status ${{ env.SERVICE_NAME }} --no-pager -l
           DEPLOY
