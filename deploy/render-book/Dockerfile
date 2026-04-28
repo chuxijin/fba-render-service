@@ -1,4 +1,4 @@
-FROM python:3.11-slim-bookworm
+FROM python:3.12-slim-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -36,3 +36,4 @@ EXPOSE 9000
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["uvicorn", "render_service.app.main:app", "--host", "0.0.0.0", "--port", "9000"]
+
