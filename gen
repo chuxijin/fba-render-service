@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_path="${BASH_SOURCE[0]:-$0}"
+if command -v readlink >/dev/null 2>&1; then
+  resolved="$(readlink -f "$script_path" 2>/dev/null || echo "$script_path")"
+else
+  resolved="$script_path"
+fi
+cd "$(dirname "$resolved")"
+
+cmd="${1:-help}"
+
+resolve_python() {
+  if [ -x ".venv/Scripts/python.exe" ]; then
+    echo ".venv/Scripts/python.exe"
+    return 0
+  fi
+  if [ -x ".venv/bin/python" ]; then
+    echo ".venv/bin/python"
+    return 0
+  fi
+  return 1
+}
+
+case "$cmd" in
+  run)
+    if ! py="$(resolve_python)"; then
+      echo ".venv not found."
+      echo "Create it with:"
+      echo "  python -m venv .venv"
+      echo "  .venv/Scripts/pip install -r render_service/requirements.txt   # Windows"
+      echo "  .venv/bin/pip install -r render_service/requirements.txt       # Linux/Mac"
+      exit 1
+    fi
+    host="${RENDER_SERVICE_HOST:-0.0.0.0}"
+    port="${RENDER_SERVICE_PORT:-9000}"
+    echo "Starting render service on http://${host}:${port} ..."
+    exec "$py" -m uvicorn render_service.app.main:app --host "$host" --port "$port" --reload
+    ;;
+  help|-h|--help|"")
+    cat <<'EOF'
+Usage: ./gen <command>
+
+Commands:
+  run    Start the FastAPI render service (uvicorn --reload, default 0.0.0.0:9000)
+  help   Show this help
+
+Env overrides:
+  RENDER_SERVICE_HOST   override bind host
+  RENDER_SERVICE_PORT   override port
+EOF
+    ;;
+  *)
+    echo "Unknown command: $cmd"
+    echo "Run './gen help' for usage."
+    exit 1
+    ;;
+esac

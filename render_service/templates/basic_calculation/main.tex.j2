@@ -24,19 +24,25 @@
     'amber': {'accent': 'B7791F', 'soft': 'FFF7E6'}
 } %}
 {% set colors = theme_map.get(theme, theme_map['amber']) %}
+{% set multi_section = sections | length > 1 %}
+{% set ans_cols = 5 %}
 \documentclass[11pt,{{ paper_size }}]{ctexart}
 \usepackage[{{ paper_size }},margin={{ page_margin }}]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage[table]{xcolor}
 \usepackage{multicol}
 \usepackage{enumitem}
+\usepackage{fontspec}
+\usepackage{tabularx}
+\setmainfont{Times New Roman}
 \definecolor{accent}{HTML}{ {{ colors.accent }} }
+\definecolor{soft}{HTML}{ {{ colors.soft }} }
 \definecolor{ink}{HTML}{111827}
 \definecolor{muted}{HTML}{64748B}
 \pagestyle{empty}
 \setlength{\parindent}{0pt}
 \setlength{\columnsep}{1.1cm}
-\setlist[enumerate]{leftmargin=*,itemsep=1.25em,topsep=0.3em}
+\setlist[enumerate]{leftmargin=*,itemsep=1.25em,topsep=0.3em,font=\Large}
 
 \begin{document}
 
@@ -50,6 +56,15 @@
 
 {% if show_question_body %}
 {% for section in sections %}
+{% if multi_section %}
+{% if not loop.first %}
+\clearpage
+{% endif %}
+\begin{center}
+{\heiti\Large\textcolor{accent}{ {{ section.get('title', '基础计算') | tex_escape }} }}
+\end{center}
+\vspace{0.5em}
+{% endif %}
 \begin{enumerate}
 {% for question in section.get('questions', []) %}
 \item {\Large {{ question.get('stem_text', '') | tex_escape }} } \vspace{1.45em}
@@ -65,15 +80,31 @@
 {\small\textcolor{muted}{建议先完成题目后再核对答案。}}
 \end{center}
 \vspace{0.5em}
-\begin{multicols}{3}
-\begin{enumerate}
 {% for section in sections %}
-{% for question in section.get('questions', []) %}
-\item {{ question.get('answer_text', '') | tex_escape }}
+{% if multi_section %}
+\vspace{0.6em}
+{\heiti\large\textcolor{accent}{ {{ section.get('title', '基础计算') | tex_escape }} }}
+\vspace{0.3em}
+{% endif %}
+
+{% set questions = section.get('questions', []) %}
+\noindent
+\renewcommand{\arraystretch}{1.6}
+\begin{tabularx}{\textwidth}{ {{ '*{' ~ ans_cols ~ '}{X}' }} }
+{% for question in questions %}
+{\Large\textbf{ {{- question.get('number', loop.index) -}} .}}~{\Large {{ question.get('answer_text', '') | tex_escape }} }{% if not loop.last and loop.index % ans_cols == 0 %} \\
+{% elif not loop.last %} & {% endif %}
+
 {% endfor %}
+
+{% if questions | length % ans_cols != 0 %}
+{% for _ in range(ans_cols - questions | length % ans_cols) %}
+& {% endfor %}
+\\
+{% endif %}
+\end{tabularx}
+\renewcommand{\arraystretch}{1.0}
 {% endfor %}
-\end{enumerate}
-\end{multicols}
 {% endif %}
 
 \end{document}
