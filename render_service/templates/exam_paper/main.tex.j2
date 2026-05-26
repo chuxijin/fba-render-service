@@ -125,6 +125,8 @@
 {% set practice_cover_creator = metadata_data.get('practice_cover_creator', '') %}
 {% set practice_cover_update_time = metadata_data.get('practice_cover_update_time', '') %}
 {% set practice_cover_img = metadata_data.get('practice_cover_img', '') %}
+{% set practice_cover_username = metadata_data.get('practice_cover_username', metadata_data.get('practice_cover_creator', '')) %}
+{% set practice_cover_avatar = metadata_data.get('practice_cover_avatar', '') %}
 {% set show_header = metadata_data.get('show_header', True) %}
 {% set show_footer = metadata_data.get('show_footer', True) %}
 {% set show_header_rule = metadata_data.get('show_header_rule', True) %}
@@ -215,7 +217,7 @@
 {% endif %}
 {%- endmacro %}
 
-{% macro render_exam_cover(book_data, cover_title_lines, cover_notice_title, cover_notice_lines, cover_ticket_label, cover_name_label, cover_strip_label, cover_bottom_note, cover_sidebar_x, cover_sidebar_center_gap, cover_ticket_rule_length, cover_name_rule_length, cover_content_left, cover_content_right, cover_title_top, cover_notice_top, cover_bottom_note_left, cover_bottom_note_bottom) -%}
+{% macro render_exam_cover(book_data, cover_title_lines, cover_notice_title, cover_notice_lines, cover_ticket_label, cover_name_label, cover_strip_label, cover_bottom_note, cover_sidebar_x, cover_sidebar_center_gap, cover_ticket_rule_length, cover_name_rule_length, cover_content_left, cover_content_right, cover_title_top, cover_notice_top, cover_bottom_note_left, cover_bottom_note_bottom, practice_cover_username, practice_cover_avatar) -%}
 \begin{titlepage}
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture,overlay]
@@ -248,12 +250,22 @@
 \node[anchor=west,align=left,text width=\dimexpr\paperwidth-{{ cover_bottom_note_left }}-{{ cover_content_right }}\relax] at (coverBottomNoteLeft) {
 {{ font_switch(cover_font_family) }}{\fontsize{13pt}{22pt}\selectfont\bfseries {{ cover_bottom_note | tex_escape }}}
 };
+{% if practice_cover_username or practice_cover_avatar %}
+\fill[white,rounded corners=0.22cm,draw=black!10,line width=0.35pt] ($(current page.south east)+(-5.35cm,0.9cm)$) rectangle ($(current page.south east)+(-0.75cm,2.18cm)$);
+\node[anchor=east,text=inkmuted,font=\fontsize{9.5pt}{12pt}\selectfont] at ($(current page.south east)+(-2.05cm,1.54cm)$) { {{ font_switch(cover_font_family) }} {{ (practice_cover_username or '用户') | tex_escape }} };
+{% if practice_cover_avatar %}
+\node[anchor=center] at ($(current page.south east)+(-1.35cm,1.54cm)$) {\includegraphics[width=0.82cm,height=0.82cm]{ {{ practice_cover_avatar }} }};
+{% else %}
+\fill[black!8] ($(current page.south east)+(-1.35cm,1.54cm)$) circle (0.41cm);
+\node[anchor=center,text=black!55,font=\fontsize{8.5pt}{8.5pt}\selectfont\bfseries] at ($(current page.south east)+(-1.35cm,1.54cm)$) { {{ font_switch(cover_font_family) }} 人 };
+{% endif %}
+{% endif %}
 \end{tikzpicture}
 \null
 \end{titlepage}
 {%- endmacro %}
 
-{% macro render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img) -%}
+{% macro render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img, practice_cover_username, practice_cover_avatar) -%}
 \begin{titlepage}
 \thispagestyle{empty}
 \begin{tikzpicture}[remember picture,overlay]
@@ -272,6 +284,16 @@
 \fill[accent!16] ($(current page.south west)+(2.25cm,7.55cm)$) rectangle ($(current page.south west)+(6.1cm,8.15cm)$);
 \fill[accent!16] ($(current page.south west)+(2.25cm,6.75cm)$) rectangle ($(current page.south west)+(5.35cm,7.35cm)$);
 \node[anchor=west,text=accent,font=\fontsize{12pt}{15pt}\selectfont] at ($(current page.south west)+(2.15cm,1.6cm)$) { {{ font_switch(cover_font_family) }} {{ practice_cover_footer | tex_escape }} };
+{% if practice_cover_username or practice_cover_avatar %}
+\fill[white,rounded corners=0.22cm,draw=accent!18,line width=0.35pt] ($(current page.south east)+(-6.0cm,5.5cm)$) rectangle ($(current page.south east)+(-2.0cm,6.95cm)$);
+\node[anchor=east,text=accentdark,font=\large\bfseries] at ($(current page.south east)+(-3.6cm,6.25cm)$) { {{ (practice_cover_username or practice_cover_creator or '用户') | tex_escape }} };
+{% if practice_cover_avatar %}
+\node[anchor=center] at ($(current page.south east)+(-2.8cm,6.25cm)$) {\includegraphics[width=1cm,height=1cm]{ {{ practice_cover_avatar }} }};
+{% else %}
+\fill[accent] ($(current page.south east)+(-2.8cm,6.25cm)$) circle (0.5cm);
+\node[anchor=center,text=white,font=\bfseries] at ($(current page.south east)+(-2.8cm,6.25cm)$) { {{ font_switch(cover_font_family) }} 人 };
+{% endif %}
+{% endif %}
 \end{tikzpicture}
 
 \vspace*{5.15cm}
@@ -382,11 +404,11 @@
 \begin{document}
 
 {% if show_exam_cover %}
-{{ render_exam_cover(book_data, cover_title_lines, cover_notice_title, cover_notice_lines, cover_ticket_label, cover_name_label, cover_strip_label, cover_bottom_note, cover_sidebar_x, cover_sidebar_center_gap, cover_ticket_rule_length, cover_name_rule_length, cover_content_left, cover_content_right, cover_title_top, cover_notice_top, cover_bottom_note_left, cover_bottom_note_bottom) }}
+{{ render_exam_cover(book_data, cover_title_lines, cover_notice_title, cover_notice_lines, cover_ticket_label, cover_name_label, cover_strip_label, cover_bottom_note, cover_sidebar_x, cover_sidebar_center_gap, cover_ticket_rule_length, cover_name_rule_length, cover_content_left, cover_content_right, cover_title_top, cover_notice_top, cover_bottom_note_left, cover_bottom_note_bottom, practice_cover_username, practice_cover_avatar) }}
 {% endif %}
 
 {% if show_practice_cover %}
-{{ render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img) }}
+{{ render_practice_cover(book_data, template_name, practice_cover_kicker, practice_cover_badge, practice_cover_meta, practice_cover_footer, paper_data, metadata_data, practice_cover_motto, practice_cover_creator, practice_cover_update_time, practice_cover_img, practice_cover_username, practice_cover_avatar) }}
 {% endif %}
 
 {% if not first_page_header_footer %}

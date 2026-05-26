@@ -50,9 +50,9 @@ def compile_pdf(workspace: Path, render_variant: str) -> tuple[Path, Path]:
         '-outdir=' + str(workspace),
         str(workspace / f'{stem}.tex'),
     ]
-    result = subprocess.run(command, cwd=workspace, capture_output=True, text=True, check=False)
+    result = subprocess.run(command, cwd=workspace, capture_output=True, text=True, encoding='utf-8', errors='replace', check=False)
     log_path = workspace / f'{stem}.log'
-    combined_output = result.stdout + '\n' + result.stderr
+    combined_output = (result.stdout or '') + '\n' + (result.stderr or '')
     log_path.write_text(combined_output, encoding='utf-8')
     if result.returncode != 0:
         raise RuntimeError(f'LaTeX 编译失败，详情见日志：{log_path}')

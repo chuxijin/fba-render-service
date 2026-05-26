@@ -17,6 +17,7 @@ render_service/output/*
 render_service/workdir/*
 !render_service/workdir/.gitignore
 !render_service/workdir/README.md
+test_output/
 .ace-tool/
 
 .claude/
