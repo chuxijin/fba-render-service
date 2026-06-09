@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import tomllib
 import re
+import unicodedata
 from pathlib import Path
 
 from bs4 import BeautifulSoup, NavigableString, Tag
@@ -201,11 +202,51 @@ def html_plain_text(value: object) -> str:
     return _compact_whitespace(soup.get_text(' ', strip=True))
 
 
-def option_layout_columns(value: object) -> int:
+_PAPER_WIDTH_MM: dict[str, float] = {
+    'a4': 210, 'a5': 148, 'b5': 176, 'letter': 215.9, 'legal': 215.9,
+}
+
+
+def _parse_mm(val: object, fallback: float) -> float:
+    if val is None:
+        return fallback
+    s = str(val).strip().lower()
+    m = re.match(r'([0-9]*\.?[0-9]+)\s*(mm|cm|in|pt)?', s)
+    if not m:
+        return fallback
+    n = float(m.group(1))
+    u = m.group(2) or 'cm'
+    if u == 'mm':
+        return n
+    if u == 'cm':
+        return n * 10
+    if u == 'in':
+        return n * 25.4
+    return n / 2.845  # pt -> mm
+
+
+def _effective_width(text: str) -> float:
+    """Return typographic width in em units (1 em ≈ CJK character)."""
+    w = 0.0
+    for ch in text:
+        if unicodedata.east_asian_width(ch) in ('W', 'F'):
+            w += 1.0
+        else:
+            w += 0.55
+    return w
+
+
+def option_layout_columns(
+    value: object,
+    font_size: object = None,
+    page_margin: object = None,
+    paper_size: object = None,
+) -> int:
     if not isinstance(value, list) or not value:
         return 1
 
-    estimated_lengths: list[int] = []
+    # Collect effective widths of each option
+    effective_widths: list[float] = []
     for item in value:
         if not isinstance(item, dict):
             return 1
@@ -221,20 +262,49 @@ def option_layout_columns(value: object) -> int:
             or '\\[' in raw
         ):
             return 1
-
         plain = html_plain_text(raw)
-        estimated_lengths.append(len(plain))
+        effective_widths.append(_effective_width(plain))
 
-    if not estimated_lengths:
+    if not effective_widths:
         return 1
 
-    max_len = max(estimated_lengths)
-    avg_len = sum(estimated_lengths) / len(estimated_lengths)
+    # Parse page geometry to compute actual available width
+    fs_str = str(font_size or '11pt').strip().lower()
+    fs_m = re.match(r'([0-9]*\.?[0-9]+)\s*pt', fs_str)
+    fs = float(fs_m.group(1)) if fs_m else 11.0
 
-    if len(value) >= 4 and max_len <= 12 and avg_len <= 8:
-        return 4
-    if max_len <= 26 and avg_len <= 18:
+    ps_str = str(paper_size or 'a4').strip().lower()
+    if 'paperwidth=' in ps_str:
+        pw_m = re.search(r'paperwidth=\s*([0-9]*\.?[0-9]+)\s*(mm|cm|in|pt)?', ps_str)
+        page_w_mm = _parse_mm(pw_m.group(0).split('=', 1)[1], 210.0) if pw_m else 210.0
+    else:
+        page_w_mm = _PAPER_WIDTH_MM.get(ps_str.replace('paper', ''), 210.0)
+    margin_mm = _parse_mm(page_margin, 18.0)
+
+    text_w_mm = page_w_mm - 2 * margin_mm
+    text_w_em = (text_w_mm * 2.845) / fs  # mm -> pt -> em
+
+    # Layout constants (in em)
+    indent_em = 2.2
+    label_em = 2.05
+    gap_em = 1.2
+
+    max_w = max(effective_widths)
+    avg_w = sum(effective_widths) / len(effective_widths)
+
+    def _content_width(cols: int) -> float:
+        """Available text width per column in em."""
+        return (text_w_em - indent_em - (cols - 1) * gap_em) / cols - label_em
+
+    if len(value) >= 4:
+        avail4 = _content_width(4)
+        if max_w <= avail4 and avg_w <= avail4 * 0.9:
+            return 4
+
+    avail2 = _content_width(2)
+    if max_w <= avail2 and avg_w <= avail2 * 0.9:
         return 2
+
     return 1
 
 

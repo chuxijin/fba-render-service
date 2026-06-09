@@ -166,7 +166,7 @@
 {%- endmacro %}
 
 {% macro render_option_list(options) -%}
-{% set option_columns = options | option_layout_columns %}
+{% set option_columns = options | option_layout_columns(base_font_size, page_margin, paper_size) %}
 {% if option_columns == 1 %}
 {% for option in options %}
 \begingroup
@@ -176,7 +176,7 @@
 \noindent{{ render_option_label(option) }}{{ render_option_content(option) }}\par
 \endgroup
 {% if not loop.last %}
-\vspace{0.2em}
+\vspace{0.35em}
 {% endif %}
 {% endfor %}
 {% else %}
@@ -190,7 +190,7 @@
 {% else %}
 ~
 {% endif %}{% if not loop.last %} & {% endif %}
-{% endfor %} \\{% if not loop.last %}[0.45em]{% endif %}
+{% endfor %} \\{% if not loop.last %}[0.6em]{% endif %}
 {% endfor %}
 \end{tabularx}}
 {% endif %}
@@ -381,7 +381,7 @@
 \vspace{0.45em}
 \noindent
 \hangindent=2.5em\hangafter=1
-{\bfseries\makebox[2.2em][l]{ {{ question.get('number', loop.index) }}.}}\hspace{0.28em}{{ render_question_source_prefix(question) }}%
+{\bfseries\makebox[2.2em][l]{\textrm{ {{ question.get('number', loop.index) }}.}}}\hspace{0.28em}{{ render_question_source_prefix(question) }}%
 {% if question.get('stem_tex') %}
 {{ question.get('stem_tex') }}
 {% else %}
