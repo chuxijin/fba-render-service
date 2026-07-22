@@ -1,0 +1,17 @@
+[Unit]
+Description=FBA PDF Render Service
+After=network.target
+
+[Service]
+Type=simple
+User=render
+Group=render
+WorkingDirectory=/srv/render_pdf
+EnvironmentFile=/etc/fba-render-book.env
+ExecStart=/srv/render_pdf/.venv/bin/python -m uvicorn render_service.app.main:app --host 127.0.0.1 --port 9000
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

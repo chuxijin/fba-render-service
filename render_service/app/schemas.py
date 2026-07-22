@@ -14,10 +14,12 @@ RenderDeliveryMode = Literal['single_pdf', 'split_pdf']
 
 class TemplateSummary(BaseModel):
     key: str
+    version: str
+    digest: str
     name: str
     description: str = ''
+    enabled: bool = True
     entrypoint: str = 'main.tex.j2'
-    template_source: str | None = None
     default_variant: RenderVariant = 'questions_only'
     supported_variants: list[RenderVariant] = Field(default_factory=lambda: ['questions_only'])
     variant_entrypoints: dict[str, str] = Field(default_factory=dict)
@@ -25,6 +27,8 @@ class TemplateSummary(BaseModel):
 
 class RenderRequest(BaseModel):
     template_key: str = Field(..., min_length=1, max_length=100)
+    template_version: str | None = Field(default=None, pattern=r'^\d+\.\d+\.\d+$')
+    template_digest: str | None = Field(default=None, pattern=r'^[a-f0-9]{64}$')
     job_id: str | None = Field(default=None, max_length=64)
     render_variant: RenderVariant | None = None
     compile_pdf: bool = True
@@ -46,6 +50,8 @@ class RenderRequest(BaseModel):
 class RenderResponse(BaseModel):
     job_id: str
     template_key: str
+    template_version: str
+    template_digest: str
     render_variant: RenderVariant
     entrypoint: str
     status: str

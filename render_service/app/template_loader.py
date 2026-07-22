@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import tomllib
+import hashlib
 import re
 import unicodedata
+
+from functools import lru_cache
 from pathlib import Path
 
-from bs4 import BeautifulSoup, NavigableString, Tag
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
+import tomllib
 
+from bs4 import BeautifulSoup, NavigableString, Tag
+from jinja2 import Environment, FileSystemLoader, StrictUndefined, TemplateNotFound
 from render_service.app.config import settings
 from render_service.app.schemas import (
     RenderAnswerLayout,
@@ -22,6 +25,19 @@ _MATH_PATTERN = re.compile(
 )
 
 _CIRCLED_NUMBER_REPLACEMENTS: dict[str, str] = {}
+_VERSION_PATTERN = re.compile(r'^\d+\.\d+\.\d+$')
+
+
+def _calculate_template_digest(template_root: Path) -> str:
+    digest = hashlib.sha256()
+    files = sorted(path for path in template_root.rglob('*') if path.is_file())
+    for file_path in files:
+        relative_path = file_path.relative_to(template_root).as_posix().encode()
+        digest.update(relative_path)
+        digest.update(b'\0')
+        digest.update(file_path.read_bytes())
+        digest.update(b'\0')
+    return digest.hexdigest()
 
 
 def _escape_text_preserving_math(value: str) -> str:
@@ -323,11 +339,15 @@ def build_environment() -> Environment:
     return env
 
 
-def load_manifest(template_key: str) -> TemplateSummary:
-    manifest_path = settings.templates_root / template_key / 'manifest.toml'
-    if not manifest_path.exists():
-        return TemplateSummary(key=template_key, name=template_key, template_source=template_key)
+def _version_key(version: str) -> tuple[int, int, int]:
+    if not _VERSION_PATTERN.fullmatch(version):
+        raise ValueError(f'模板版本必须使用 x.y.z 格式：{version}')
+    major, minor, patch = version.split('.')
+    return int(major), int(minor), int(patch)
 
+
+@lru_cache(maxsize=256)
+def _read_manifest(manifest_path: Path, template_key: str, template_version: str) -> TemplateSummary:
     payload = tomllib.loads(manifest_path.read_text(encoding='utf-8'))
     variant_entrypoints = payload.get('variant_entrypoints', {}) or {}
     default_variant = payload.get('default_variant', 'questions_only')
@@ -336,16 +356,51 @@ def load_manifest(template_key: str) -> TemplateSummary:
     if 'questions_only' not in variant_entrypoints:
         variant_entrypoints['questions_only'] = payload.get('entrypoint', 'main.tex.j2')
 
-    return TemplateSummary(
+    manifest = TemplateSummary(
         key=payload.get('key', template_key),
+        version=payload.get('version', template_version),
+        digest=_calculate_template_digest(manifest_path.parent),
         name=payload.get('name', template_key),
         description=payload.get('description', ''),
+        enabled=payload.get('enabled', True),
         entrypoint=payload.get('entrypoint', 'main.tex.j2'),
-        template_source=payload.get('template_source', template_key),
         default_variant=default_variant,
         supported_variants=list(variant_entrypoints.keys()),
         variant_entrypoints=variant_entrypoints,
     )
+    if manifest.key != template_key or manifest.version != template_version:
+        raise ValueError(f'模板清单与目录不一致：{manifest_path}')
+    _version_key(manifest.version)
+    for entrypoint in manifest.variant_entrypoints.values():
+        entrypoint_path = manifest_path.parent / entrypoint
+        if not entrypoint_path.is_file():
+            raise ValueError(f'模板入口文件不存在：{entrypoint_path}')
+    return manifest
+
+
+def load_manifest(template_key: str, template_version: str | None = None) -> TemplateSummary:
+    template_root = settings.templates_root / template_key
+    if template_version:
+        manifest_path = template_root / template_version / 'manifest.toml'
+        if not manifest_path.is_file():
+            raise TemplateNotFound(f'{template_key}@{template_version}')
+        manifest = _read_manifest(manifest_path, template_key, template_version)
+        if not manifest.enabled:
+            raise TemplateNotFound(f'{template_key}@{template_version}')
+        return manifest
+
+    manifests: list[TemplateSummary] = []
+    if template_root.is_dir():
+        for version_dir in template_root.iterdir():
+            manifest_path = version_dir / 'manifest.toml'
+            if not version_dir.is_dir() or not manifest_path.is_file():
+                continue
+            manifest = _read_manifest(manifest_path, template_key, version_dir.name)
+            if manifest.enabled:
+                manifests.append(manifest)
+    if not manifests:
+        raise TemplateNotFound(template_key)
+    return max(manifests, key=lambda item: _version_key(item.version))
 
 
 def list_templates() -> list[TemplateSummary]:
@@ -353,8 +408,17 @@ def list_templates() -> list[TemplateSummary]:
         return []
     templates: list[TemplateSummary] = []
     for template_dir in sorted(path for path in settings.templates_root.iterdir() if path.is_dir()):
-        templates.append(load_manifest(template_dir.name))
+        manifest = _load_latest_manifest_if_available(template_dir.name)
+        if manifest is not None:
+            templates.append(manifest)
     return templates
+
+
+def _load_latest_manifest_if_available(template_key: str) -> TemplateSummary | None:
+    try:
+        return load_manifest(template_key)
+    except TemplateNotFound:
+        return None
 
 
 def _resolve_render_variant_from_context(context: dict) -> RenderVariant | None:
@@ -423,11 +487,16 @@ def resolve_entrypoint(
     return resolved_variant, entrypoint
 
 
-def render_template(template_key: str, context: dict, render_variant: RenderVariant | None = None) -> tuple[TemplateSummary, RenderVariant, str, str]:
-    manifest = load_manifest(template_key)
+def render_template(
+    template_key: str,
+    context: dict,
+    render_variant: RenderVariant | None = None,
+    template_version: str | None = None,
+) -> tuple[TemplateSummary, RenderVariant, str, str]:
+    manifest = load_manifest(template_key, template_version)
     env = build_environment()
     resolved_variant, entrypoint = resolve_entrypoint(manifest, context, render_variant)
-    template_root = manifest.template_source or manifest.key
+    template_root = f'{manifest.key}/{manifest.version}'
     template = env.get_template(f'{template_root}/{entrypoint}')
     render_context = dict(context)
     render_context['render_variant'] = resolved_variant

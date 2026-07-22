@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     host: str = '0.0.0.0'
     port: int = 9000
     data_root: Path = _prefer_container_path('/data', APP_ROOT)
-    templates_root: Path = _prefer_container_path('/app/render_service/templates', APP_ROOT / 'templates')
+    templates_root: Path = _prefer_container_path('/app/templates', APP_ROOT / 'templates')
     fonts_root: Path = _prefer_container_path('/app/render_service/fonts', APP_ROOT / 'fonts')
     output_root: Path = _prefer_container_path('/data/output', APP_ROOT / 'output')
     work_root: Path = _prefer_container_path('/data/workdir', APP_ROOT / 'workdir')

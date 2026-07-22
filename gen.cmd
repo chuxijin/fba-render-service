@@ -26,6 +26,12 @@ set RENDER_SERVICE_HOST=%RENDER_SERVICE_HOST%
 if "%RENDER_SERVICE_HOST%"=="" set RENDER_SERVICE_HOST=0.0.0.0
 set RENDER_SERVICE_PORT=%RENDER_SERVICE_PORT%
 if "%RENDER_SERVICE_PORT%"=="" set RENDER_SERVICE_PORT=9000
+if "%RENDER_SERVICE_TEMPLATES_ROOT%"=="" if exist "..\fba\backend\plugin\render_book\templates" set RENDER_SERVICE_TEMPLATES_ROOT=%~dp0..\fba\backend\plugin\render_book\templates
+if "%RENDER_SERVICE_TEMPLATES_ROOT%"=="" (
+  echo Template directory not found. Set RENDER_SERVICE_TEMPLATES_ROOT.
+  popd
+  exit /b 1
+)
 
 echo Starting render service on http://%RENDER_SERVICE_HOST%:%RENDER_SERVICE_PORT% ...
 .venv\Scripts\python.exe -m uvicorn render_service.app.main:app --host %RENDER_SERVICE_HOST% --port %RENDER_SERVICE_PORT% --reload
@@ -42,5 +48,6 @@ echo.
 echo Env overrides:
 echo   RENDER_SERVICE_HOST   override bind host
 echo   RENDER_SERVICE_PORT   override port
+echo   RENDER_SERVICE_TEMPLATES_ROOT   versioned template release directory
 popd
 goto :eof

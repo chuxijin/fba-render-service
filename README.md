@@ -3,7 +3,7 @@
 独立的题本 PDF 渲染服务，为主业务系统提供高质量 PDF 输出能力。
 
 - 使用 `Jinja2 + LaTeX + XeLaTeX/latexmk` 生成正式 PDF
-- 推荐通过 Docker 部署，保证字体和 TeX 环境稳定
+- 推荐使用 systemd 运行宿主机服务，并固定字体和 TeX 环境
 - 优先服务 `fba` 主后端，也可被其他系统调用
 
 ## 文档类参考
@@ -87,7 +87,6 @@ render_pdf/
   render_service/
     requirements.txt
     app/
-    templates/
     fonts/
     output/
     workdir/
@@ -95,21 +94,11 @@ render_pdf/
 
 ## 启动建议
 
-Docker 部署：
+云服务器直接运行宿主机服务，配置 `RENDER_SERVICE_TEMPLATES_ROOT=/srv/fba/backend/plugin/render_book/templates`，再使用 `systemd` 管理进程，具体示例见 `deploy/render-book/README.md`。本地执行 `gen run` 时会自动查找同级 FBA 仓库中的模板目录，也可以通过 `RENDER_SERVICE_TEMPLATES_ROOT` 显式指定其他模板发布目录。
 
-```bash
-cd deploy/render-book
-cp .env.example .env
-docker compose up -d --build
-```
+## 模板来源
 
-## 当前内置模板
-
-| 模板 key | 名称 | 说明 |
-|---------|------|------|
-| `exam_paper` | 真题套卷 | 母版模板，完整套卷 + 考试封面 |
-| `practice` | 刷题练习本 | 专项训练 / 自由组卷 + 练习封面 |
-| `wrong_question` | 错题重刷 | 个性化错题本 |
+模板源码由 FBA 的 `backend/plugin/render_book/templates/<template_key>/<version>/` 统一管理。本服务通过 `RENDER_SERVICE_TEMPLATES_ROOT` 消费只读发布目录；渲染请求使用 `template_key + template_version + template_digest` 固定并校验模板内容。
 
 ## 渲染协议
 
@@ -135,11 +124,6 @@ docker compose up -d --build
 
 - `GET /api/v1/jobs/{job_id}/artifacts/{render_variant}/pdf`
 - `GET /api/v1/jobs/{job_id}/artifacts/{render_variant}/log`
-
-## 模板复用机制
-
-- 模板目录下的 `manifest.toml` 可通过 `template_source = "exam_paper"` 复用已有版式
-- 业务题本类型和底层 LaTeX 版式解耦，新增题本时通常只需要补 manifest
 
 ## 富文本与图片处理
 

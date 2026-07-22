@@ -35,6 +35,15 @@ case "$cmd" in
     fi
     host="${RENDER_SERVICE_HOST:-0.0.0.0}"
     port="${RENDER_SERVICE_PORT:-9000}"
+    if [ -z "${RENDER_SERVICE_TEMPLATES_ROOT:-}" ]; then
+      local_templates="../fba/backend/plugin/render_book/templates"
+      if [ ! -d "$local_templates" ]; then
+        echo "Template directory not found. Set RENDER_SERVICE_TEMPLATES_ROOT."
+        exit 1
+      fi
+      RENDER_SERVICE_TEMPLATES_ROOT="$(cd "$local_templates" && pwd)"
+      export RENDER_SERVICE_TEMPLATES_ROOT
+    fi
     echo "Starting render service on http://${host}:${port} ..."
     exec "$py" -m uvicorn render_service.app.main:app --host "$host" --port "$port" --reload
     ;;
@@ -49,6 +58,7 @@ Commands:
 Env overrides:
   RENDER_SERVICE_HOST   override bind host
   RENDER_SERVICE_PORT   override port
+  RENDER_SERVICE_TEMPLATES_ROOT   versioned template release directory
 EOF
     ;;
   *)

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from jinja2 import TemplateNotFound
-
 from render_service.app.asset_localizer import localize_context_images
 from render_service.app.config import settings
 from render_service.app.latex import (
@@ -18,14 +18,13 @@ from render_service.app.latex import (
     write_request_snapshot,
     write_tex_file,
 )
-from render_service.app.schemas import RenderRequest, RenderResponse, new_job_id
-from render_service.app.template_loader import list_templates, render_template
-from render_service.app.template_loader import load_manifest, resolve_entrypoint
 from render_service.app.preview_generator import generate_pdf_previews
+from render_service.app.schemas import RenderRequest, RenderResponse, new_job_id
+from render_service.app.template_loader import list_templates, load_manifest, render_template, resolve_entrypoint
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     ensure_directories()
     yield
 
@@ -64,7 +63,7 @@ async def get_templates() -> list[dict]:
 
 
 @app.get('/api/v1/jobs/{job_id}/artifacts/{render_variant}/{artifact_kind}')
-async def get_job_artifact(job_id: str, render_variant: str, artifact_kind: str):
+async def get_job_artifact(job_id: str, render_variant: str, artifact_kind: str) -> FileResponse:
     artifact_path = resolve_artifact_path(job_id, render_variant, artifact_kind)
     if not artifact_path.exists() or not artifact_path.is_file():
         raise HTTPException(status_code=404, detail='产物不存在。')
@@ -83,23 +82,27 @@ async def get_job_artifact(job_id: str, render_variant: str, artifact_kind: str)
     )
 
 
-@app.post('/api/v1/render', response_model=RenderResponse)
+@app.post('/api/v1/render')
 async def render_book(payload: RenderRequest) -> RenderResponse:
     job_id = payload.job_id or new_job_id()
-    manifest_for_variant = load_manifest(payload.template_key)
-    resolved_variant, _ = resolve_entrypoint(manifest_for_variant, payload.context, payload.render_variant)
-    workspace = create_job_workspace(job_id, resolved_variant)
-    localized_context = await localize_context_images(context=payload.context, workspace=workspace)
-
     try:
+        manifest_for_variant = load_manifest(payload.template_key, payload.template_version)
+        if payload.template_digest and payload.template_digest != manifest_for_variant.digest:
+            raise HTTPException(status_code=409, detail='模板摘要不一致，请同步模板发布产物。')
+        resolved_variant, _ = resolve_entrypoint(manifest_for_variant, payload.context, payload.render_variant)
+        workspace = create_job_workspace(job_id, resolved_variant)
+        localized_context = await localize_context_images(context=payload.context, workspace=workspace)
         manifest, render_variant, entrypoint, tex_source = render_template(
             payload.template_key,
             localized_context,
             resolved_variant,
+            payload.template_version,
         )
     except TemplateNotFound as exc:
         raise HTTPException(status_code=404, detail=f'模板不存在：{payload.template_key}') from exc
-    except Exception as exc:  # noqa: BLE001
+    except HTTPException:
+        raise
+    except Exception as exc:
         raise HTTPException(status_code=400, detail=f'模板渲染失败：{exc}') from exc
 
     workspace = create_job_workspace(job_id, render_variant)
@@ -124,19 +127,21 @@ async def render_book(payload: RenderRequest) -> RenderResponse:
             raise HTTPException(status_code=500, detail=str(exc)) from exc
         pdf_path = publish_pdf(job_id, render_variant, generated_pdf)
         log_path = latex_log_path
-        
+
         # 截取前五页高质量预览图
         preview_files = generate_pdf_previews(pdf_path, settings.output_root, max_pages=5)
         for i, _ in enumerate(preview_files):
             # artifact_kind = preview_1, preview_2...
-            preview_download_paths.append(build_artifact_route(job_id, render_variant, f'preview_{i+1}'))
-            
+            preview_download_paths.append(build_artifact_route(job_id, render_variant, f'preview_{i + 1}'))
+
         status = 'compiled'
         cleanup_auxiliary_files(workspace)
 
     return RenderResponse(
         job_id=job_id,
         template_key=manifest.key,
+        template_version=manifest.version,
+        template_digest=manifest.digest,
         render_variant=render_variant,
         entrypoint=entrypoint,
         status=status,
